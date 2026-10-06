@@ -76,9 +76,11 @@ class ImageText:
         self._conn = conn_factory
         self.ocr_enabled = ocr_enabled and ocr_available()
 
-    def get(self, path: Path, conn=None) -> dict:
+    def get(self, path: Path, conn=None, ocr: bool = True) -> dict:
         """Return {"key", "ocr", "caption"} for an image file, running OCR if not cached.
 
+        With ocr=False, an image not read yet is only recorded (ocr_done=0) for a later `read_pending`,
+        so indexing a document with many figures doesn't wait for OCR.
         Pass `conn` when called inside an open write transaction (a second connection would block).
         """
         try:
@@ -90,6 +92,10 @@ class ImageText:
             row = c.execute("SELECT ocr, caption, ocr_done FROM image_meta WHERE key=?", (key,)).fetchone()
         if row and (row["ocr_done"] or not self.ocr_enabled):
             return {"key": key, "ocr": row["ocr"] or "", "caption": row["caption"] or ""}
+        if not ocr:
+            with self._use(conn) as c:
+                c.execute("INSERT INTO image_meta(key, ocr_done) VALUES(?, 0) ON CONFLICT(key) DO NOTHING", (key,))
+            return {"key": key, "ocr": "", "caption": row["caption"] if row else ""}
         text = ocr_bytes(data) if self.ocr_enabled else ""
         with self._use(conn) as c:
             c.execute(
@@ -106,6 +112,11 @@ class ImageText:
         else:
             with self._conn() as c:
                 yield c
+
+    def set_ocr(self, key: str, text: str) -> None:
+        with self._conn() as c:
+            c.execute("INSERT INTO image_meta(key, ocr, ocr_done) VALUES(?,?,1) "
+                      "ON CONFLICT(key) DO UPDATE SET ocr=excluded.ocr, ocr_done=1", (key, text))
 
     def set_caption(self, key: str, caption: str, model: str) -> None:
         with self._conn() as c:

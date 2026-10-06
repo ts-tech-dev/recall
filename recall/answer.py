@@ -114,13 +114,14 @@ def _excerpt(text: str, words: int) -> str:
     return " ".join(w[:words]) + (" …" if len(w) > words else "")
 
 
-def local_answer(question: str, mode: str, hits: list[dict]) -> str:
-    """Extractive answer used when no AI provider is configured."""
+def local_answer(question: str, mode: str, hits: list[dict], ai_switched_off: bool = False) -> str:
+    """Extractive answer used when AI is off or no AI provider is configured."""
     if not hits:
         return "No matching notes were found for this question."
     take = hits[:4] if mode == "summary" else hits[:10]
     words = 70 if mode == "summary" else 250
-    out = ["_No AI provider is configured, so these are the most relevant passages from your notes._", ""]
+    why = "AI features are turned off in Settings" if ai_switched_off else "No AI provider is configured"
+    out = [f"_{why}, so these are the most relevant passages from your notes._", ""]
     for h in take:
         out.append(f"### [{h['n']}] {h['title']} — {h['heading']}")
         out.append("")
@@ -145,7 +146,7 @@ def answer_events(index: Index, settings: Settings, question: str, mode: str,
         {k: h[k] for k in ("n", "path", "title", "heading", "anchor", "snippet", "images", "ext")} for h in hits
     ]
     if not settings.ai_enabled() or not hits:
-        yield "delta", local_answer(question, mode, hits)
+        yield "delta", local_answer(question, mode, hits, ai_switched_off=not settings.ai_features)
         yield "done", {"ai": False}
         return
     blocks = [{"type": "text", "text": build_prompt(question, mode, hits, images)}]

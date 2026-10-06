@@ -92,3 +92,29 @@ def test_changing_model_drops_old_vectors(notes, data):
     b = Index(notes, data, embedder=FakeEmbedder("model-b"))
     assert b.stats()["vectors"] == 0
     assert b.build()["embedded"] == b.stats()["chunks"]
+
+
+class CountingEmbedder(FakeEmbedder):
+    def __init__(self):
+        super().__init__("counting")
+        self.passages = []
+
+    def embed_passages(self, texts):
+        self.passages += texts
+        return super().embed_passages(texts)
+
+
+def test_only_changed_passages_are_reembedded(notes, data):
+    note = notes / "sections.md"
+    note.write_text("# Sections\n\n## Alpha\n\nFirst part about apples.\n\n## Beta\n\nSecond part about bananas.\n")
+    idx = Index(notes, data, embedder=CountingEmbedder())
+    idx.build()
+    idx.embedder.passages.clear()
+    note.write_text("# Sections\n\n## Alpha\n\nFirst part about apples.\n\n## Beta\n\nSecond part about cherries.\n")
+    import os
+    import time
+
+    os.utime(note, (time.time() + 5, time.time() + 5))
+    assert idx.build()["embedded"] == 1
+    assert len(idx.embedder.passages) == 1 and "cherries" in idx.embedder.passages[0]
+    assert idx.stats()["vectors"] == idx.stats()["chunks"]

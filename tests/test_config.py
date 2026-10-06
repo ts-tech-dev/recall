@@ -52,3 +52,24 @@ def test_local_openai_endpoint_needs_no_key():
     assert Settings(provider="openai", base_url="http://localhost:11434/v1").ai_enabled()
     assert not Settings(provider="openai").ai_enabled()
     assert not Settings(provider="none", api_key="k").ai_enabled()
+
+
+def test_ai_switch_keeps_provider_settings(data):
+    s = Settings(provider="anthropic", api_key="sk-ant-123456789", caption_images=True)
+    assert s.ai_enabled()
+    apply_update(s, {"ai_features": False})
+    assert not s.ai_enabled() and s.public()["ai_enabled"] is False
+    assert s.api_key == "sk-ant-123456789" and s.provider == "anthropic"  # kept for when it's switched back on
+    apply_update(s, {"ai_features": True})
+    assert s.ai_enabled()
+
+
+def test_ai_switch_off_stops_image_captions(data, notes):
+    from recall.state import State
+
+    st = State(background=False)
+    apply_update(st.settings, {"notes_dir": str(notes), "semantic_search": False, "rerank": False,
+                               "api_key": "sk-ant-123456789", "caption_images": True})
+    assert st.open_index().captioner is not None
+    apply_update(st.settings, {"ai_features": False})
+    assert st.open_index().captioner is None

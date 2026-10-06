@@ -165,3 +165,37 @@ def test_unsupported_and_broken(notes, ctx):
         extract(notes / "images/vlan-diagram.png", ctx)
     with pytest.raises(Exception):
         extract(notes / "broken.pdf", ctx)
+
+
+def test_parallel_pdf_reading_matches_serial(tmp_path, ctx, monkeypatch):
+    from recall.extractors import pdf
+
+    _manual_pdf(tmp_path / "guide.pdf")
+    serial = extract(tmp_path / "guide.pdf", ctx).markdown
+    monkeypatch.setattr(pdf, "PARALLEL_MIN_PAGES", 2)
+    monkeypatch.setenv("RECALL_PDF_WORKERS", "2")
+    assert extract(tmp_path / "guide.pdf", ctx).markdown == serial
+
+
+def test_extract_cache_reused_until_file_changes(tmp_path, ctx, monkeypatch):
+    import os
+
+    from recall.extractors import EXTRACTORS
+    from recall.extractors.cache import ExtractCache
+
+    _manual_pdf(tmp_path / "guide.pdf")
+    calls = []
+    real = EXTRACTORS["pdf"]
+    monkeypatch.setitem(EXTRACTORS, "pdf", lambda p, c: calls.append(p) or real(p, c))
+    cache = ExtractCache(tmp_path / "cache")
+    first = cache.extract(tmp_path / "guide.pdf", "guide.pdf", ctx, extract)
+    assert cache.extract(tmp_path / "guide.pdf", "guide.pdf", ctx, extract) == first and len(calls) == 1
+    st = (tmp_path / "guide.pdf").stat()
+    os.utime(tmp_path / "guide.pdf", ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))
+    cache.extract(tmp_path / "guide.pdf", "guide.pdf", ctx, extract)
+    assert len(calls) == 2  # changed file: read again
+    (tmp_path / "n.md").write_text("# N")
+    cache.extract(tmp_path / "n.md", "n.md", ctx, extract)
+    assert not cache._file("n.md").exists()  # Markdown is quick to read: not cached
+    cache.delete("guide.pdf")
+    assert cache.get(tmp_path / "guide.pdf", "guide.pdf") is None

@@ -57,13 +57,15 @@ const bareTask = {
 
 // A term line: not a heading, quote, list item, table row, fence or definition itself.
 const TERM = String.raw`(?![#>|*+\-\`~:]|\d+[.)]\s|\s{4})[^\n]+`;
+const DL_START = new RegExp(String.raw`(?:^|\n)${TERM}\n:[ \t]+\S`);
+const DL_BLOCK = new RegExp(String.raw`^((?:${TERM}\n(?::[ \t]+[^\n]*(?:\n|$))+\n?)+)`);
 
 const definitionList = {
   name: "definitionList",
   level: "block",
-  start: src => { const m = new RegExp(`(?:^|\\n)${TERM}\\n:[ \\t]+\\S`).exec(src); return m ? m.index + (m[0][0] === "\n" ? 1 : 0) : undefined; },
+  start: src => { const m = DL_START.exec(src); return m ? m.index + (m[0][0] === "\n" ? 1 : 0) : undefined; },
   tokenizer(src) {
-    const m = new RegExp(`^((?:${TERM}\\n(?::[ \\t]+[^\\n]*(?:\\n|$))+\\n?)+)`).exec(src);
+    const m = DL_BLOCK.exec(src);
     if (!m) return;
     const items = [];
     for (const line of m[1].split("\n")) {

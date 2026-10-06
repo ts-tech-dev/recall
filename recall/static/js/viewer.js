@@ -33,7 +33,9 @@ export async function openDoc(path, anchor = "", { pushHash = true, force = fals
     $("#doc-title").textContent = path.split("/").pop();
     if (keepScroll === null) { $("#doc-content").className = "md"; $("#doc-content").innerHTML = `<p class="muted">Loading…</p>`; }
     let d;
-    try { d = await api("/api/doc?path=" + encodeURIComponent(path)); }
+    // PDFs open in the browser's viewer; their extracted text is only fetched for "Text view".
+    const textless = /\.pdf$/i.test(path) ? "&text=false" : "";
+    try { d = await api("/api/doc?path=" + encodeURIComponent(path) + textless); }
     catch (e) { $("#doc-content").innerHTML = `<p class="error">${esc(e.message)}</p>`; $("#toc").innerHTML = ""; return; }
     if (state.currentDoc !== path) return;  // user clicked elsewhere meanwhile
     renderDoc(d);
@@ -60,7 +62,15 @@ export function renderDoc(d) {
     $("pre", c).textContent = d.markdown;
   } else if (d.kind === "pdf") {
     const showPdf = () => { c.className = "md full"; c.innerHTML = `<iframe src="${esc(d.raw_url)}" title="${esc(d.title)}"></iframe>`; toggle.textContent = "Text view"; };
-    const showText = () => { c.className = "md"; renderMarkdown(c, d.markdown); toggle.textContent = "PDF view"; buildToc(); };
+    const showText = async () => {
+      if (d.markdown == null) {
+        c.className = "md"; c.innerHTML = `<p class="muted">Reading the PDF's text…</p>`;
+        try { d.markdown = (await api("/api/doc?path=" + encodeURIComponent(d.path))).markdown; }
+        catch (e) { c.innerHTML = `<p class="error">${esc(e.message)}</p>`; return; }
+        if (state.currentDoc !== d.path) return;
+      }
+      c.className = "md"; renderMarkdown(c, d.markdown); toggle.textContent = "PDF view"; buildToc();
+    };
     toggle.onclick = () => (c.querySelector("iframe") ? showText() : showPdf());
     showPdf();
   } else {

@@ -9,6 +9,8 @@ become Markdown tables.
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -22,6 +24,7 @@ MAX_SECTION_LEVELS = 3  # deeper bookmark levels are folded into their parent se
 HEADING_SIZE_RATIO = 1.15  # a line this much larger than the body text may be a heading
 MARGIN_RATIO = 0.08  # top/bottom part of the page where running headers and footers live
 RUNNING_MIN_SHARE = 0.05  # share of pages a margin line must repeat on to count as a header/footer…
+PARALLEL_MIN_PAGES = 60  # longer PDFs are read by several processes at once (RECALL_PDF_WORKERS=1 turns it off)
 RUNNING_MAX_REPEATS = 10  # …or this many pages, whichever is fewer (long manuals with per-chapter footers)
 
 
@@ -106,6 +109,45 @@ def _page_blocks(page) -> list[Block]:
     return out
 
 
+def _blocks_for_pages(path: str, start: int, stop: int) -> list[list[Block]]:
+    """Worker: the blocks of pages start..stop-1 (each process opens the PDF itself)."""
+    import pymupdf as fitz
+
+    fitz.no_recommend_layout()
+    with fitz.open(path) as doc:
+        return [_page_blocks(doc[i]) for i in range(start, stop)]
+
+
+def _workers() -> int:
+    env = os.environ.get("RECALL_PDF_WORKERS", "")
+    if env.isdigit():
+        return max(1, int(env))
+    try:
+        cpus = len(os.sched_getaffinity(0))  # respects container/cgroup CPU limits
+    except AttributeError:  # Windows, macOS
+        cpus = os.cpu_count() or 1
+    return max(1, min(cpus - 1, 8))  # leave a core for the server
+
+
+def _all_page_blocks(path: Path, doc) -> list[list[Block]]:
+    """Blocks of every page; table detection is slow, so long PDFs are split across processes."""
+    n, workers = len(doc), _workers()
+    if n < PARALLEL_MIN_PAGES or workers < 2:
+        return [_page_blocks(page) for page in doc]
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+
+    step = -(-n // (workers * 3))  # a few batches per worker evens out slow pages
+    batches = [(str(path), i, min(i + step, n)) for i in range(0, n, step)]
+    try:
+        # "spawn": forking a server with running threads isn't safe. The Windows app calls freeze_support().
+        with ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn")) as pool:
+            return [blocks for part in pool.map(_blocks_for_pages, *zip(*batches)) for blocks in part]
+    except Exception as e:  # no subprocesses allowed here, a worker crashed…: read it in this process
+        logging.getLogger("recall.extractors").warning("Parallel PDF reading failed (%s); reading %s serially", e, path.name)
+        return [_page_blocks(page) for page in doc]
+
+
 def _drop_running_lines(pages: list[list[Block]]) -> None:
     """Remove headers/footers (page numbers, document titles) that repeat in the margins of most pages."""
     if len(pages) < 3:
@@ -174,7 +216,7 @@ def extract_pdf(path: Path, ctx: Context) -> ExtractedDoc:
     doc = fitz.open(path)
     try:
         title = (doc.metadata or {}).get("title") or path.stem
-        pages = [_page_blocks(page) for page in doc]
+        pages = _all_page_blocks(path, doc)
         _drop_running_lines(pages)
         if not _mark_outline_headings(doc, pages):
             _mark_font_headings(pages)

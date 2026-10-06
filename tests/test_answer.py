@@ -273,3 +273,14 @@ def test_real_anthropic_sdk_auth_error(monkeypatch):
                         lambda **kw: real(**kw, max_retries=0, http_client=httpx.Client(transport=httpx.MockTransport(handler))))
     with pytest.raises(llm.LLMError, match="rejected the API key"):
         "".join(llm.stream_answer(Settings(api_key="bad"), "S", [{"type": "text", "text": "q"}], 10))
+
+
+def test_ai_switch_off_makes_no_ai_calls(index, monkeypatch):
+    def fail(*a, **k):
+        raise AssertionError("the AI must not be called while AI features are off")
+
+    monkeypatch.setattr(answer_mod, "stream_answer", fail)
+    s = Settings(provider="anthropic", api_key="sk-test", ai_features=False)
+    out = collect(answer_events(index, s, "how to upgrade kubernetes", "summary"))
+    assert out["done"]["ai"] is False
+    assert out["text"].startswith("_AI features are turned off in Settings")

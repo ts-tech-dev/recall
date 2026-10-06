@@ -16,3 +16,4 @@ dialog legend { font-weight: 600; padding: 0 6px; }
 .lightbox { position: fixed; inset: 0; background: rgba(0, 0, 0, .8); display: flex; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; padding: 24px; }
 .lightbox img { max-width: 100%; max-height: 100%; border-radius: 6px; background: #fff; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 8px; z-index: 60; font-size: 14px; }
+dialog fieldset.off label:not(.check:first-of-type) { opacity: .55; }

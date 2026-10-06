@@ -118,3 +118,21 @@ def test_caption_image_strips_refusal_note(monkeypatch):
     monkeypatch.setattr(llm, "stream_answer", lambda s, *a, **k: iter([f"A chart ({s.model}, {s.effort})"]))
     out = llm.caption_image(Settings(api_key="k", caption_model="claude-haiku-4-5"), "AAA", "image/png")
     assert out == "A chart (claude-haiku-4-5, low)"
+
+
+def test_ocr_runs_after_text_is_searchable(image_notes, data, monkeypatch):
+    """A document's text is indexed before its images are OCR'd, then the image text is folded in."""
+    idx = Index(image_notes, data, ocr=True)
+    seen_during_ocr = []
+    real = images_mod.ocr_bytes
+
+    def ocr(b):
+        if not seen_during_ocr:
+            seen_during_ocr.append([r["path"] for r in idx.search("Edge firewall rule set", mode="keyword")])
+        return real(b)
+
+    monkeypatch.setattr(images_mod, "ocr_bytes", ocr)
+    s = idx.build()
+    assert "firewall/edge.md" in seen_during_ocr[0]  # searchable while OCR was still running
+    assert s["ocr"] >= 1
+    assert "firewall/edge.md" in [r["path"] for r in idx.search("8443 DMZ")]  # image text arrived afterwards

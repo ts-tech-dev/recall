@@ -12,8 +12,9 @@ from urllib.parse import unquote
 
 import numpy as np
 
+from .. import images as images_mod
 from ..chunker import chunk_markdown
-from ..extractors import IMAGE_EXTS, Context, extract, file_url
+from ..extractors import IMAGE_EXTS, Context, file_url
 from .schema import REBUILT_TABLES
 
 log = logging.getLogger("recall.index")
@@ -36,6 +37,12 @@ class BuildMixin:
             return {"skipped": "already running"}
         try:
             stats = self._build(full)
+            # Text first, so the notes are searchable right away; then OCR the new images and fold their
+            # text in (only passages that show those images are re-embedded).
+            stats["ocr"] = self._ocr_pending()
+            if stats["ocr"]:
+                again = self._build(False)
+                stats["updated"] += again["updated"]
             if self.captioner and self.caption_limit > 0:
                 stats["captioned"] = self._caption_images()
                 if stats["captioned"]:
@@ -80,6 +87,7 @@ class BuildMixin:
             for rel, row in known.items():
                 if rel not in seen:
                     self._delete_doc(c, row["id"])
+                    self.extracts.delete(rel)
                     stats["removed"] += 1
                     changed.append(rel)
             c.commit()
@@ -107,7 +115,11 @@ class BuildMixin:
         return f"[image{' ' + repr(alt) if alt else ''} {'; '.join(parts)}]" if parts else ""
 
     def _index_file(self, c, p: Path, rel: str, st, old_id, ctx: Context) -> str | None:
+        keep = {}  # embeddings of passages that come out the same are reused, not recomputed
         if old_id:
+            keep = {(r["title"], r["heading"], r["text"]): r["vec"] for r in c.execute(
+                "SELECT d.title, ch.heading, ch.text, v.vec FROM chunks ch JOIN docs d ON d.id=ch.doc_id "
+                "JOIN vectors v ON v.chunk_id=ch.id WHERE ch.doc_id=?", (old_id,))}
             self._delete_doc(c, old_id)
         folder = Path(rel).parent.as_posix()
         folder = "" if folder == "." else folder
@@ -119,7 +131,7 @@ class BuildMixin:
             if is_image:
                 title = p.name
             else:
-                doc = extract(p, ctx)
+                doc = self.extract(p, ctx)
                 title = doc.title
                 chunks = chunk_markdown(doc.markdown, doc.title)
         except Exception as e:  # a broken file must not stop the whole run
@@ -134,7 +146,7 @@ class BuildMixin:
 
         rows = []  # (heading, anchor, text, images)
         if is_image:
-            info = self.images.get(p, c)
+            info = self.images.get(p, c, ocr=False)
             c.execute("INSERT INTO doc_images VALUES(?,?,?)", (doc_id, info["key"], str(p)))
             text = "\n".join(x for x in (info["caption"], info["ocr"]) if x)
             if text:  # only images with recognizable content become searchable
@@ -145,7 +157,7 @@ class BuildMixin:
                 local = self.resolve_image(img["url"])
                 if not local:
                     continue
-                info = self.images.get(local, c)
+                info = self.images.get(local, c, ocr=False)
                 c.execute("INSERT INTO doc_images VALUES(?,?,?)", (doc_id, info["key"], str(local)))
                 if info["caption"]:
                     img["caption"] = info["caption"]
@@ -160,10 +172,41 @@ class BuildMixin:
             ).lastrowid
             c.execute("INSERT INTO chunks_fts(rowid,title,heading,text,tags) VALUES(?,?,?,?,?)",
                       (cid, title, heading, text, tags))
+            vec = keep.get((title, heading, text))
+            if vec is not None:
+                c.execute("INSERT INTO vectors VALUES(?,?)", (cid, vec))
         if doc:
             targets = {unquote(m) for m in DOC_LINK_RE.findall(doc.markdown)} - {rel}
             c.executemany("INSERT INTO links VALUES(?,?)", [(doc_id, t) for t in sorted(targets)])
         return err
+
+    def _ocr_pending(self) -> int:
+        """Read the text in images that indexing recorded but didn't OCR yet. Returns how many had text."""
+        if not self.images.ocr_enabled:
+            return 0
+        with self._conn() as c:
+            todo = c.execute(
+                "SELECT di.key, MIN(di.path) AS path FROM doc_images di JOIN image_meta m ON m.key=di.key "
+                "WHERE m.ocr_done=0 GROUP BY di.key").fetchall()
+        if not todo:
+            return 0
+        self.progress.update(phase="ocr", done=0, total=len(todo), current="")
+        found = 0
+        for i, r in enumerate(todo, 1):
+            p = Path(r["path"])
+            self.progress.update(current=p.name, done=i - 1)
+            try:
+                text = images_mod.ocr_bytes(p.read_bytes())
+            except OSError:
+                text = ""
+            self.images.set_ocr(r["key"], text)
+            if text:
+                found += 1
+                with self._conn() as c:  # the notes that show this image get its text on the next pass
+                    c.execute("UPDATE docs SET mtime=-1 WHERE id IN (SELECT doc_id FROM doc_images WHERE key=?)",
+                              (r["key"],))
+        self.progress["done"] = len(todo)
+        return found
 
     def _embed_missing(self) -> int:
         """Embed every chunk that has no vector yet (new/changed chunks, or after a model change)."""

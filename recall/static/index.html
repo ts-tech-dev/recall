@@ -171,6 +171,9 @@
     </label>
     <fieldset>
       <legend>AI answer generation</legend>
+      <label class="check"><input type="checkbox" name="ai_features"> Use AI features (written answers, image descriptions)</label>
+      <span class="hint" id="ai-off-hint">Off: Ask shows the most relevant passages from your notes and nothing is sent to an AI
+        provider. Your provider, model and key are kept.</span>
       <label>Provider
         <select name="provider">
           <option value="anthropic">Anthropic (Claude)</option>
@@ -219,7 +222,7 @@
       </datalist>
       <label class="check"><input type="checkbox" name="ocr"> Read text in images and scanned PDFs (OCR)</label>
       <label class="check"><input type="checkbox" name="watch"> Re-index automatically when files change</label>
-      <label class="check"><input type="checkbox" name="caption_images"> Describe images with AI so they're searchable (uses API calls)</label>
+      <label class="check" data-ai><input type="checkbox" name="caption_images"> Describe images with AI so they're searchable (uses API calls)</label>
       <div class="row">
         <label>Caption model <input name="caption_model" placeholder="same as above" autocomplete="off"></label>
         <label>Max captions per run <input name="caption_limit" type="number" min="0" max="5000"></label>

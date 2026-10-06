@@ -72,6 +72,9 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
   - Anthropic: default model `claude-opus-5-5`, adjustable effort, and server-side refusal fallback.
   - OpenAI-compatible: OpenAI, or local models through Ollama or LM Studio (set a Base URL such as `http://localhost:11434/v1`).
   - None: shows the retrieved passages, no AI call.
+  - **Use AI features** in Settings switches all AI off or on at once (written answers and image descriptions).
+    When it's off, nothing is sent to an AI provider and Ask shows the most relevant passages; the provider, model
+    and key are kept for when you switch it back on.
 
   With *Send note images to the AI* on, the top images are attached so the model can judge which ones are relevant.
 - **Smart search (by meaning)**: a local embedding model (`BAAI/bge-base-en-v1.5`, about 210 MB, downloaded
@@ -100,8 +103,12 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 - **Moving files**: drag a file onto a folder in the file list, or onto empty space for the top level, or use
   *Move…* on the open note. Relative links and images inside a moved note are updated, and so are relative
   links to it from other notes. `[[Wiki links]]` find notes by name, so they keep working.
-- **Incremental indexing**: only new or changed files are re-read, OCR'd and embedded. Unreadable files are listed
-  in the status bar.
+- **Incremental indexing**: only new or changed files are re-read, OCR'd and embedded, and when a note changes
+  only the passages that changed are embedded again. Unreadable files are listed in the status bar.
+- **Fast with big files**: text is indexed first, so new notes are searchable within seconds; the text in images is
+  read (OCR) afterwards and added when ready. Long PDFs are read by several processes at once
+  (`RECALL_PDF_WORKERS` sets how many). The extracted text of PDFs and Office files is kept, so opening them in Browse
+  is instant, and a PDF opens straight in the browser's viewer (its text is only loaded for *Text view*).
 
 ## How it works
 

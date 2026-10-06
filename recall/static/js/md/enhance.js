@@ -81,9 +81,11 @@ export function tags(el) {
   }
 }
 
-/** "![alt|300](x.png)" or "![alt|300x200](x.png)" sets the image size (Obsidian style). */
+/** "![alt|300](x.png)" or "![alt|300x200](x.png)" sets the image size (Obsidian style). Images load lazily,
+ * so a long document doesn't fetch every figure up front. */
 export function imageSizes(el) {
   for (const img of $$("img", el)) {
+    img.loading = "lazy";
     const m = /^(.*?)\|\s*(\d+)(?:\s*x\s*(\d+))?\s*$/.exec(img.getAttribute("alt") || "");
     if (!m) continue;
     img.alt = m[1].trim();

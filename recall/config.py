@@ -30,6 +30,7 @@ def data_dir() -> Path:
 @dataclass
 class Settings:
     notes_dir: str = ""
+    ai_features: bool = True  # master switch: off = no AI calls at all (Ask shows passages, no image captions)
     provider: str = "anthropic"
     api_key: str = ""
     model: str = "claude-opus-5-5"
@@ -55,7 +56,7 @@ class Settings:
         return os.environ.get(env, "")
 
     def ai_enabled(self) -> bool:
-        if self.provider == "none":
+        if not self.ai_features or self.provider == "none":
             return False
         if self.provider == "openai" and self.base_url:
             return True  # local servers (Ollama, LM Studio) usually need no key

@@ -16,7 +16,8 @@ def test_build_indexes_every_type_and_skips_hidden(index):
 
 
 def test_incremental_rebuild(index, notes):
-    assert index.build() == {"added": 0, "updated": 0, "unchanged": 13, "removed": 0, "errors": 0, "embedded": 0}
+    assert index.build() == {"added": 0, "updated": 0, "unchanged": 13, "removed": 0, "errors": 0, "embedded": 0,
+                             "ocr": 0}
     (notes / "backups.md").write_text("# Backups\n\nNow using Borg instead.\n")
     os.utime(notes / "backups.md", (time.time() + 5, time.time() + 5))
     (notes / "todo.txt").unlink()

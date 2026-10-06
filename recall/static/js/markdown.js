@@ -9,10 +9,33 @@ import { enableTasks } from "./tasks.js";
 
 const emoji = await fetch("/static/vendor/emoji.json").then(r => r.json()).catch(() => ({}));
 
-marked.setOptions({ gfm: true, breaks: false });
-marked.use({ extensions: [...extensions, emojiExtension(emoji)] });
-if (window.markedFootnote) marked.use(markedFootnote({ description: "Footnotes" }));
-if (window.markedKatex) marked.use(markedKatex({ throwOnError: false, output: "htmlAndMathml" }));
+/**
+ * marked asks every block extension where it could start before each paragraph, passing the whole rest of the
+ * document. Searching all of it makes long notes slow (quadratic: 9 s for a 750 KB PDF text), and only the
+ * current paragraph matters, since an extension can only interrupt that one. So each search stops at the next
+ * blank line.
+ */
+function withinParagraph(options) {
+  const exts = (options.extensions || []).map(ext => ext.level !== "block" || !ext.start ? ext : {
+    ...ext,
+    start(src) {
+      const blank = /\n[ \t]*\n/.exec(src);
+      return ext.start.call(this, blank ? src.slice(0, blank.index + 1) : src);
+    },
+  });
+  return { ...options, extensions: exts };
+}
+
+function makeParser(footnotes) {
+  const m = new marked.Marked({ gfm: true, breaks: false });
+  m.use(withinParagraph({ extensions: [...extensions, emojiExtension(emoji)] }));
+  if (window.markedKatex) m.use(withinParagraph(markedKatex({ throwOnError: false, output: "htmlAndMathml" })));
+  if (footnotes && window.markedFootnote) m.use(withinParagraph(markedFootnote({ description: "Footnotes" })));
+  return m;
+}
+// The footnote extension slows every parse (~2 s on a 750 KB note), so it's only used when a note has "[^".
+const parser = makeParser(false), footnoteParser = makeParser(true);
+const parse = md => (md.includes("[^") ? footnoteParser : parser).parse(md);
 
 /** Mark the checkboxes of task list items and bare "[ ]" lines (in document order). */
 function markTasks(el) {
@@ -34,7 +57,7 @@ function markTasks(el) {
  * `onTask(index, checked, count)`: make task checkboxes clickable; it saves and returns true, or false to undo.
  */
 export function renderMarkdown(el, md, { answer = false, onTask = null } = {}) {
-  el.innerHTML = DOMPurify.sanitize(marked.parse(md), { ADD_ATTR: ["target"] });
+  el.innerHTML = DOMPurify.sanitize(parse(md), { ADD_ATTR: ["target"] });
   if (answer) {
     $$("img", el).forEach(img => { if (!(img.getAttribute("src") || "").startsWith("/api/")) img.remove(); });
     linkCitations(el);

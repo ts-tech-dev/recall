@@ -7,7 +7,7 @@ import { loadTree } from "./tree.js";
 
 export const TEXT_SETTINGS = ["notes_dir", "provider", "model", "base_url", "effort", "max_images", "top_k", "embed_model", "rerank_model",
   "caption_model", "caption_limit"];
-export const BOOL_SETTINGS = ["send_images", "semantic_search", "rerank", "ocr", "watch", "caption_images"];
+export const BOOL_SETTINGS = ["ai_features", "send_images", "semantic_search", "rerank", "ocr", "watch", "caption_images"];
 
 export function openSettings() {
   const f = $("#settings-form"), s = state.status?.settings || {};
@@ -30,8 +30,16 @@ export function openSettings() {
   $("#settings").showModal();
 }
 export function syncProviderFields() {
-  const f = $("#settings-form"), p = f.elements.provider.value;
+  const f = $("#settings-form"), p = f.elements.provider.value, on = f.elements.ai_features.checked;
   $$("[data-for]", f).forEach(el => (el.hidden = el.dataset.for !== p));
+  // With AI switched off, its options stay visible (and saved) but can't be changed.
+  const aiBox = f.elements.ai_features.closest("fieldset");
+  // "Passages retrieved" also sets how many passages Ask shows without AI, so it stays editable.
+  for (const el of [...aiBox.elements, ...$$("[data-ai] input", f)]) {
+    if (el.name !== "ai_features" && el.name !== "top_k") el.disabled = !on;
+  }
+  aiBox.classList.toggle("off", !on);
+  $("#ai-off-hint").hidden = on;
   f.elements.model.placeholder = p === "anthropic" ? "claude-opus-5-5" : "gpt-4o / llama3.2 / …";
 }
 export async function saveSettings(ev) {
@@ -56,5 +64,6 @@ export async function saveSettings(ev) {
 export function bindSettings() {
   $("#open-settings").onclick = openSettings;
   $("#settings-form").elements.provider.onchange = syncProviderFields;
+  $("#settings-form").elements.ai_features.onchange = syncProviderFields;
   $("#settings-form").addEventListener("submit", e => { if (e.submitter?.value === "save") saveSettings(e); });
 }

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from .. import editing
-from ..extractors import IMAGE_EXTS, NOTE_TYPES, extract, file_url
+from ..extractors import IMAGE_EXTS, NOTE_TYPES, file_url
 from ..index import Index
 from ..state import get_index
 
@@ -63,7 +63,8 @@ def folders(idx: Index = Depends(get_index)):
 
 
 @router.get("/doc")
-def doc(path: str, idx: Index = Depends(get_index)):
+def doc(path: str, text: bool = True, idx: Index = Depends(get_index)):
+    """A file for the previewer. text=false skips reading a PDF's text (the browser's PDF viewer shows it)."""
     p = safe_file(idx, path)
     ext = p.suffix.lower()
     base = {"path": path, "name": p.name, "ext": ext, "raw_url": file_url(path), "info": idx.doc_info(path),
@@ -72,8 +73,11 @@ def doc(path: str, idx: Index = Depends(get_index)):
         return {**base, "kind": "image", "title": p.name}
     if ext not in NOTE_TYPES:
         raise HTTPException(415, "Unsupported file type")
+    if ext == ".pdf" and not text:
+        info = base["info"] or {}
+        return {**base, "kind": "pdf", "title": info.get("title") or p.stem, "markdown": None, "tags": info.get("tags", [])}
     try:
-        d = extract(p, idx.context())
+        d = idx.extract(p)
     except Exception as e:
         raise HTTPException(422, f"Could not read {p.name}: {e}")
     kind = "pdf" if ext == ".pdf" else d.kind

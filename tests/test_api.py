@@ -163,3 +163,15 @@ def test_ask_unexpected_error_is_reported(ready, monkeypatch):
 
 def test_ask_empty_question(ready):
     assert ready.post("/api/ask", json={"question": "  "}, headers=H).status_code == 400
+
+
+def test_pdf_preview_without_text_and_cached_extraction(ready, notes):
+    d = ready.get("/api/doc", params={"path": "k8s-upgrade.pdf", "text": "false"}).json()
+    assert d["kind"] == "pdf" and d["markdown"] is None and d["title"] == "K8s Upgrade"
+    full = ready.get("/api/doc", params={"path": "k8s-upgrade.pdf"}).json()
+    assert "Drain each node" in full["markdown"]
+    idx = ready.app.state.recall.require_index()
+    assert idx.extracts.get(notes / "k8s-upgrade.pdf", "k8s-upgrade.pdf") is not None  # stored while indexing
+    (notes / "k8s-upgrade.pdf").unlink()
+    ready.post("/api/index?wait=true", headers=H)
+    assert not idx.extracts._file("k8s-upgrade.pdf").exists()

@@ -7,7 +7,8 @@ import { openDoc } from "./viewer.js";
 import { checkEditorDisk } from "./editor.js";
 import { renderGraph } from "./graph.js";
 
-export const PHASES = { reading: "Indexing", embedding: "Building smart search", captioning: "Describing images" };
+export const PHASES = { reading: "Indexing", ocr: "Reading text in images", embedding: "Building smart search",
+  captioning: "Describing images" };
 
 export async function refreshStatus() {
   try {

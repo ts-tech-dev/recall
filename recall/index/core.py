@@ -13,7 +13,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from ..embeddings import Embedder
-from ..extractors import IMAGE_EXTS, NOTE_TYPES, Context
+from ..extractors import IMAGE_EXTS, NOTE_TYPES, Context, ExtractedDoc, extract
+from ..extractors.cache import ExtractCache
 from ..images import ImageText, ocr_bytes
 from .build import BuildMixin
 from .graph import GraphMixin
@@ -33,6 +34,7 @@ class Index(BuildMixin, SearchMixin, GraphMixin):
         self.db_path = base / f"{key}.db"
         self.cache_dir = base / f"{key}_images"
         self.versions_dir = base / f"{key}_versions"
+        self.extracts = ExtractCache(base / f"{key}_extracted")  # Markdown of PDFs/Office files, for previews
         self.embedder = embedder
         self.embed_error = ""
         # Set by the app: a cross-encoder that re-orders the top results (see recall/rerank.py).
@@ -94,6 +96,10 @@ class Index(BuildMixin, SearchMixin, GraphMixin):
                 p = Path(dirpath) / f
                 if p.suffix.lower() in exts:
                     yield p
+
+    def extract(self, p: Path, ctx: Context | None = None) -> ExtractedDoc:
+        """A file as Markdown, from the extraction cache when it's unchanged (see extractors/cache.py)."""
+        return self.extracts.extract(p, p.relative_to(self.root).as_posix(), ctx or self.context(), extract)
 
     def context(self) -> Context:
         return Context(root=self.root, cache_dir=self.cache_dir, ocr=ocr_bytes if self.ocr else None)
