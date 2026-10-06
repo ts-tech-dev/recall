@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass, field
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
+CUSTOM_ID_RE = re.compile(r"\s*\{#([\w-]+)\}\s*$")  # "## Title {#my-id}" sets the heading's anchor
+IMAGE_SIZE_RE = re.compile(r"\s*\|\s*\d+(?:\s*x\s*\d+)?\s*$")  # "![alt|300](…)": size, not part of the alt text
 IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 HTML_IMG_RE = re.compile(r'<img\b[^>]*?\bsrc\s*=\s*["\']([^"\']+)["\'][^>]*>', re.I)
 HTML_ALT_RE = re.compile(r'\balt\s*=\s*["\']([^"\']*)["\']', re.I)
@@ -28,7 +30,7 @@ def slugify(s: str) -> str:
 
 
 def _images(md: str) -> list[dict]:
-    out = [{"alt": a.strip(), "url": u} for a, u in IMAGE_RE.findall(md)]
+    out = [{"alt": IMAGE_SIZE_RE.sub("", a).strip(), "url": u} for a, u in IMAGE_RE.findall(md)]
     for m in HTML_IMG_RE.finditer(md):
         alt = HTML_ALT_RE.search(m.group(0))
         out.append({"alt": alt.group(1) if alt else "", "url": m.group(1)})
@@ -36,7 +38,7 @@ def _images(md: str) -> list[dict]:
 
 
 def _plain(md: str) -> str:
-    md = IMAGE_RE.sub(lambda m: f"[image: {m.group(1)}]" if m.group(1) else "", md)
+    md = IMAGE_RE.sub(lambda m: f"[image: {IMAGE_SIZE_RE.sub('', m.group(1))}]" if m.group(1) else "", md)
     md = HTML_IMG_RE.sub("", md)
     md = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", md)  # links → their text
     return md.strip()
@@ -76,8 +78,9 @@ def split_sections(md: str, title: str) -> list[tuple[list[str], str]]:
 def chunk_markdown(md: str, title: str) -> list[Chunk]:
     chunks: list[Chunk] = []
     for heading_path, body in split_sections(md, title):
-        heading = " > ".join(heading_path)
-        anchor = slugify(heading_path[-1])
+        custom = CUSTOM_ID_RE.search(heading_path[-1])
+        anchor = custom.group(1) if custom else slugify(heading_path[-1])
+        heading = " > ".join(CUSTOM_ID_RE.sub("", h) for h in heading_path)
         paras = [piece for p in re.split(r"\n\s*\n", body) if p.strip() for piece in _split_long(p)]
         if not paras:
             # Heading-only sections still matter for search (e.g. a slide title).

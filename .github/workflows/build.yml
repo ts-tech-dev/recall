@@ -53,11 +53,11 @@ jobs:
           foreach ($i in 1..90) {
             Start-Sleep 2
             try {
-              $s = Invoke-RestMethod http://127.0.0.1:8765/api/status
+              $s = Invoke-RestMethod http://127.0.0.1:9999/api/status
               if ($s.index.docs -ge 1 -and -not $s.progress.running) { $ok = $true; break }
             } catch {}
           }
-          $r = if ($ok) { Invoke-RestMethod "http://127.0.0.1:8765/api/search?q=blackouts" } else { $null }
+          $r = if ($ok) { Invoke-RestMethod "http://127.0.0.1:9999/api/search?q=blackouts" } else { $null }
           Stop-Process $p -Force
           Get-Content smoke-data\recall.log -ErrorAction SilentlyContinue
           if (-not $ok) { throw "Recall.exe did not index the sample note" }

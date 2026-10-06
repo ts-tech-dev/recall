@@ -1,7 +1,7 @@
-"""Desktop launcher: runs the server on this machine and shows Recall in its own window.
+"""Desktop launcher: runs the server on this machine and opens Recall in your web browser.
 
-Used as the entry point of the Windows app (see packaging/). Falls back to the default browser
-when no native web view is available.
+Used as the entry point of the Windows app (see packaging/). While it runs, a tray icon offers
+"Open Recall" and "Quit". Without a system tray (or with RECALL_NO_WINDOW set) it just keeps serving.
 """
 
 from __future__ import annotations
@@ -12,13 +12,12 @@ import socket
 import sys
 import threading
 import time
-import traceback
 import urllib.request
 import webbrowser
 from pathlib import Path
 
 HOST = "127.0.0.1"
-PREFERRED_PORT = 8765  # a stable port keeps the browser's saved questions (they are per-origin)
+DEFAULT_PORT = 9999  # a stable port keeps the browser's saved questions (they are per-origin)
 
 
 def _default_data_dir() -> Path:
@@ -43,8 +42,8 @@ def _running_recall(port: int) -> bool:
         return False
 
 
-def _free_port() -> int:
-    for port in (PREFERRED_PORT, 0):
+def _free_port(preferred: int) -> int:
+    for port in (preferred, 0):
         with socket.socket() as s:
             try:
                 s.bind((HOST, port))
@@ -54,40 +53,47 @@ def _free_port() -> int:
     raise RuntimeError("no free port")
 
 
-def _unblock_dlls() -> None:
-    """Remove the "downloaded from the internet" mark from the bundled DLLs.
-
-    Extracting a downloaded zip with Explorer marks every file (a Zone.Identifier stream), and .NET
-    Framework then refuses to load pythonnet's DLLs, which the native window needs.
-    """
-    if sys.platform != "win32" or not getattr(sys, "frozen", False):
-        return
-    for dll in Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)).rglob("*.dll"):
-        try:
-            os.remove(f"{dll}:Zone.Identifier")
-        except OSError:
-            pass
+def _open_browser(url: str) -> None:
+    if not os.environ.get("RECALL_NO_WINDOW"):  # set for headless runs, e.g. the CI smoke test
+        webbrowser.open(url)
 
 
-def _show(url: str) -> bool:
-    """Open a native window; returns False if no web view is available."""
+def _tray_image():
+    """A small Recall logo for the tray, drawn at runtime so no image file has to be bundled."""
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((0, 0, 63, 63), radius=14, fill=(47, 111, 223))
+    d.line((18, 16, 18, 48), fill="white", width=6)
+    d.arc((14, 16, 46, 36), start=-90, end=90, fill="white", width=6)
+    d.line((18, 16, 30, 16), fill="white", width=6)
+    d.line((18, 36, 30, 36), fill="white", width=6)
+    d.line((30, 36, 44, 48), fill="white", width=6)
+    return img
+
+
+def _run_tray(url: str, stop) -> bool:
+    """Show the tray icon until Quit; returns False if no tray is available here."""
     if os.environ.get("RECALL_NO_WINDOW"):
         return False
-    _unblock_dlls()
     try:
-        import webview
+        import pystray
+
+        def quit_(icon, _item):
+            icon.stop()
+
+        icon = pystray.Icon("Recall", _tray_image(), f"Recall — {url}", menu=pystray.Menu(
+            pystray.MenuItem("Open Recall", lambda *_: webbrowser.open(url), default=True),
+            pystray.MenuItem("Quit", quit_),
+        ))
+        icon.run()
     except Exception:
+        import traceback
+
+        traceback.print_exc()  # goes to recall.log; keep serving without a tray
         return False
-    try:
-        webview.settings["ALLOW_DOWNLOADS"] = True  # "Download .md" on answers
-    except Exception:
-        pass
-    try:
-        webview.create_window("Recall", url, width=1400, height=900, min_size=(800, 560))
-        webview.start()
-    except Exception:
-        traceback.print_exc()  # goes to recall.log; fall back to the browser
-        return False
+    stop()
     return True
 
 
@@ -95,20 +101,19 @@ def main() -> None:
     data = Path(os.environ.setdefault("RECALL_DATA_DIR", str(_default_data_dir())))
     data.mkdir(parents=True, exist_ok=True)
     _redirect_output(data)
+    preferred = int(os.environ.get("RECALL_PORT") or DEFAULT_PORT)
 
-    # Already open (e.g. launched twice): just show the running instance.
-    if _running_recall(PREFERRED_PORT):
-        url = f"http://{HOST}:{PREFERRED_PORT}/"
-        if not _show(url):
-            webbrowser.open(url)
+    # Already running (e.g. launched twice): just open it.
+    if _running_recall(preferred):
+        _open_browser(f"http://localhost:{preferred}/")
         return
 
     import uvicorn
 
     from .app import create_app
 
-    port = _free_port()
-    url = f"http://{HOST}:{port}/"
+    port = _free_port(preferred)
+    url = f"http://localhost:{port}/"
     server = uvicorn.Server(uvicorn.Config(create_app(), host=HOST, port=port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -118,13 +123,14 @@ def main() -> None:
             raise SystemExit("Recall server failed to start; see recall.log in " + str(data))
         time.sleep(0.05)
 
-    if _show(url):
-        server.should_exit = True  # window closed: stop the server
+    print(f"Recall running at {url}")
+    _open_browser(url)
+
+    def stop():
+        server.should_exit = True
         thread.join(timeout=5)
-    else:
-        print(f"Recall running at {url}")
-        if not os.environ.get("RECALL_NO_WINDOW"):  # set for headless runs, e.g. the CI smoke test
-            webbrowser.open(url)
+
+    if not _run_tray(url, stop):
         thread.join()
 
 

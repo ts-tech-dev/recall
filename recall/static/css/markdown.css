@@ -1,0 +1,73 @@
+/* Rendered Markdown (previews, answers, editor preview). */
+
+/* markdown */
+.md { overflow-wrap: anywhere; }
+.md img { max-width: 100%; height: auto; border-radius: 6px; cursor: zoom-in; display: block; margin: 10px 0; border: 1px solid var(--border); }
+.md pre { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow: auto; }
+.md code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 90%; }
+.md pre code { background: none; padding: 0; }
+.md table { border-collapse: collapse; display: block; overflow: auto; margin: 10px 0; }
+.md th, .md td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
+.md th { background: var(--code-bg); }
+.md blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--accent); color: var(--muted); }
+.md h1, .md h2, .md h3 { line-height: 1.25; margin: 1.3em 0 .5em; scroll-margin-top: 12px; }
+.md h1:first-child, .md h2:first-child, .md h3:first-child { margin-top: 0; }
+.md a { color: var(--accent); }
+.md :target, .md .flash { background: var(--accent-soft); border-radius: 4px; }
+.md pre.plain { white-space: pre-wrap; font-family: ui-monospace, monospace; }
+
+/* task lists and bare [ ] lines */
+.md ul.task-list, .md ol.task-list { padding-left: 1.4em; }
+.md li.task-item { list-style: none; }
+.md li.task-item > input.task, .md li.task-item > p:first-child > input.task { margin: 0 .45em 0 -1.4em; }
+.md p.task-line { margin: 4px 0; }
+.md p.task-line > input.task { margin: 0 .45em 0 0; }
+.md input.task { width: 1.05em; height: 1.05em; vertical-align: -.15em; accent-color: var(--accent); opacity: 1; cursor: default; }
+.md input.task:not(:disabled) { cursor: pointer; }
+.md .task-item.done > p:first-child, .md .task-line.done { color: var(--muted); }
+.md li.task-item.done { color: var(--muted); }
+.md li.task-item.done li:not(.done) { color: var(--text); }
+
+/* inline extras */
+.md mark { background: var(--mark); color: inherit; padding: 0 2px; border-radius: 3px; }
+.md kbd { font: 12px ui-monospace, monospace; padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--code-bg); }
+.md a.tag { display: inline-block; padding: 0 7px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); text-decoration: none; font-size: .9em; }
+.md a.tag:hover { text-decoration: underline; }
+.md img.sized { display: inline-block; vertical-align: middle; }
+.md hr { border: 0; border-top: 1px solid var(--border); margin: 1.5em 0; }
+.md h4, .md h5, .md h6 { margin: 1.1em 0 .4em; scroll-margin-top: 12px; }
+.md h6 { color: var(--muted); }
+.md th[align=center], .md td[align=center] { text-align: center; }
+.md th[align=right], .md td[align=right] { text-align: right; }
+.md details { margin: 10px 0; }
+.md summary { cursor: pointer; }
+
+/* definition lists */
+.md dl { margin: 10px 0; }
+.md dt { font-weight: 600; margin-top: 8px; }
+.md dd { margin: 2px 0 0 1.5em; }
+
+/* footnotes */
+.md .footnotes { margin-top: 2em; padding-top: .5em; border-top: 1px solid var(--border); font-size: .92em; color: var(--muted); }
+.md .footnotes h2 { font-size: 1em; margin: 0 0 .4em; }
+.md sup a[data-footnote-ref] { text-decoration: none; padding: 0 2px; }
+
+/* math and diagrams */
+.md .katex-display, .md .math-block { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+.md .mermaid { margin: 12px 0; text-align: center; overflow-x: auto; }
+.md .mermaid-error { white-space: pre; font-family: ui-monospace, monospace; text-align: left; color: var(--danger); }
+
+/* callouts ("> [!note] Title") */
+.md .callout { --c: #2f6fdf; margin: 12px 0; border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); border-left: 4px solid var(--c);
+  border-radius: 8px; background: color-mix(in srgb, var(--c) 8%, transparent); padding: 8px 14px; }
+.md .callout-title { font-weight: 600; color: var(--c); }
+.md summary.callout-title { list-style-position: inside; }
+.md .callout-body { margin-top: 4px; color: var(--text); }
+.md .callout-body > :first-child { margin-top: 0; }
+.md .callout-body > :last-child { margin-bottom: 0; }
+.md .callout-abstract { --c: #0e9aa7; }
+.md .callout-tip, .md .callout-success { --c: #1f8f4e; }
+.md .callout-important, .md .callout-example { --c: #7c4dcc; }
+.md .callout-question, .md .callout-warning { --c: #d9741c; }
+.md .callout-danger { --c: #d14343; }
+.md .callout-quote { --c: #8a94a6; }

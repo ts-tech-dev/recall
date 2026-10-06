@@ -1,4 +1,6 @@
 import json
+import posixpath
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,7 +37,21 @@ def sse(text: str) -> list[tuple[str, object]]:
 def test_ui_served(client):
     r = client.get("/")
     assert r.status_code == 200 and "<title>Recall</title>" in r.text
-    assert client.get("/static/app.js").status_code == 200
+    # Every script/stylesheet the page loads, and every ES module those import, is served.
+    pending = re.findall(r'(?:src|href)="(/static/[^"]+)"', r.text)
+    seen = set()
+    while pending:
+        url = pending.pop()
+        if url in seen:
+            continue
+        seen.add(url)
+        res = client.get(url)
+        assert res.status_code == 200, url
+        if url.endswith(".js") and "/vendor/" not in url:
+            base = url.rsplit("/", 1)[0]
+            for imp in re.findall(r'^import .* from "(\.{1,2}/[^"]+)";', res.text, re.M):
+                pending.append(posixpath.normpath(f"{base}/{imp}"))
+    assert "/static/js/main.js" in seen and "/static/js/md/enhance.js" in seen
 
 
 def test_status_without_notes(client):
@@ -140,7 +156,7 @@ def test_ask_unexpected_error_is_reported(ready, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("kaboom")
 
-    monkeypatch.setattr("recall.app.answer_events", boom)
+    monkeypatch.setattr("recall.api.ask.answer_events", boom)
     ev = sse(ready.post("/api/ask", json={"question": "x"}, headers=H).text)
     assert ev == [("error", {"message": "RuntimeError: kaboom"})]
 

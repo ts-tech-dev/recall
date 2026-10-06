@@ -11,7 +11,7 @@ binaries = []
 hiddenimports = collect_submodules("recall") + collect_submodules("uvicorn")
 
 # Packages imported lazily or that ship model/config files PyInstaller can't see.
-for pkg in ("rapidocr_onnxruntime", "fastembed", "webview"):
+for pkg in ("rapidocr_onnxruntime", "fastembed", "pystray"):
     try:
         d, b, h = collect_all(pkg)
     except Exception:
@@ -37,7 +37,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="Recall",
-    console=False,  # windowed app; logs go to %LOCALAPPDATA%\Recall\recall.log
+    console=False,  # no console window (the tray icon has Quit); logs go to %LOCALAPPDATA%\Recall\recall.log
     icon=icon if os.path.exists(icon) else None,
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="Recall")

@@ -1,0 +1,94 @@
+"""Server state shared by the API routes: settings, the open index and the folder watcher."""
+
+from __future__ import annotations
+
+import base64
+import threading
+from pathlib import Path
+
+from fastapi import HTTPException, Request
+
+from .config import data_dir, load_settings
+from .embeddings import FastEmbedEmbedder
+from .embeddings import available as embeddings_available
+from .images import ocr_available
+from .index import Index
+from .llm import caption_image
+from .watcher import Watcher
+
+
+class State:
+    def __init__(self, background: bool = True):
+        self.settings = load_settings()
+        self.index: Index | None = None
+        self.watcher: Watcher | None = None
+        self.background = background  # start the folder watcher (off in most tests)
+        self.lock = threading.RLock()
+        self._signature = None
+        self._embedders: dict[str, FastEmbedEmbedder] = {}
+
+    def _embedder(self):
+        s = self.settings
+        if not s.semantic_search or not embeddings_available():
+            return None
+        if s.embed_model not in self._embedders:
+            self._embedders[s.embed_model] = FastEmbedEmbedder(s.embed_model)
+        return self._embedders[s.embed_model]
+
+    def _captioner(self):
+        s = self.settings
+        if not (s.caption_images and s.ai_enabled()):
+            return None
+        return lambda data, media_type: caption_image(self.settings, base64.b64encode(data).decode(), media_type)
+
+    @property
+    def signature(self):
+        """Changes whenever the settings that define the index (folder, models, OCR, watching) change."""
+        return self._signature
+
+    def open_index(self) -> Index | None:
+        """Return the index for the current settings, rebuilding the Index object if they changed."""
+        with self.lock:
+            s = self.settings
+            nd = s.notes_dir
+            if not nd or not Path(nd).is_dir():
+                self._close()
+                return None
+            sig = (str(Path(nd).resolve()), s.semantic_search, s.embed_model, s.ocr, s.watch)
+            if self.index is None or sig != self._signature:
+                self._close()
+                self.index = Index(Path(nd), data_dir(), embedder=self._embedder(), ocr=s.ocr and ocr_available())
+                self._signature = sig
+                if s.watch and self.background:
+                    self.watcher = Watcher(self.index)
+                    self.watcher.start()
+            self.index.captioner = self._captioner()
+            self.index.caption_limit = s.caption_limit
+            return self.index
+
+    def _close(self):
+        if self.watcher:
+            self.watcher.stop()
+        self.index, self.watcher, self._signature = None, None, None
+
+    def require_index(self) -> Index:
+        idx = self.open_index()
+        if idx is None:
+            raise HTTPException(400, "No notes directory configured. Open Settings and choose one.")
+        return idx
+
+    def reindex_async(self, full: bool = False, wait_turn: bool = False) -> None:
+        """Start a background build. wait_turn=True queues behind a running build instead of skipping."""
+        idx = self.open_index()
+        if idx is not None:
+            threading.Thread(target=idx.build, kwargs={"full": full, "block": wait_turn}, daemon=True).start()
+
+
+def get_state(request: Request) -> State:
+    """FastAPI dependency: the app's State."""
+    return request.app.state.recall
+
+
+def get_index(request: Request) -> Index:
+    """FastAPI dependency: the open index (400 if no notes folder is configured)."""
+    return get_state(request).require_index()

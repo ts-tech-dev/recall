@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from urllib.parse import quote, unquote
 
-from .extractors import EXTERNAL_RE, HTML_IMG_RE, MD_IMAGE_RE, MD_LINK_RE, _split_code
+from .extractors import EXTERNAL_RE, HTML_IMG_RE, MD_IMAGE_RE, MD_LINK_RE, split_code
 from .index import SKIP_DIRS
 
 EDITABLE_EXTS = {".md", ".markdown", ".txt"}
@@ -187,7 +187,7 @@ def _retarget(md: str, root: Path, base_old: Path, base_new: Path, moved: tuple[
         return rel + suffix if rel + suffix != target else None
 
     parts = []
-    for is_code, seg in _split_code(md):
+    for is_code, seg in split_code(md):
         if not is_code:
             spans = {}
             for rx, g in ((MD_IMAGE_RE, 2), (MD_LINK_RE, 2), (HTML_IMG_RE, 3)):

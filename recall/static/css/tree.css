@@ -1,0 +1,36 @@
+/* Sidebar file tree and search results. */
+
+/* tree */
+.tree, .side-results { overflow: auto; flex: 1; padding: 6px 4px 20px; font-size: 14px; }
+.tree ul { list-style: none; margin: 0; padding-left: 14px; }
+.tree > ul { padding-left: 0; }
+.node {
+  display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none;
+}
+.node:hover { background: var(--accent-soft); }
+.node.active { background: var(--accent); color: #fff; }
+.node .ico { width: 26px; text-align: center; flex: none; }
+.badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; border-radius: 3px; padding: 1px 0; color: #fff; background: #8a94a6; line-height: 13px; }
+.b-md { background: #4b5563; } .b-pdf { background: #d14343; } .b-doc { background: #2f6fdf; } .b-ppt { background: #d9741c; }
+.b-xls, .b-csv { background: #1f8f4e; } .b-htm { background: #7c4dcc; } .b-img { background: #0e9aa7; }
+.node.active .badge { box-shadow: 0 0 0 1px rgba(255,255,255,.7); }
+.chev::before { content: ""; display: inline-block; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-bottom: 3px; opacity: .7; }
+.dir.collapsed > .node .chev::before { transform: rotate(-45deg); margin-bottom: 0; }
+.node .name { overflow: hidden; text-overflow: ellipsis; }
+.dir.collapsed > ul { display: none; }
+.node .add { margin-left: auto; flex: none; border: 0; background: none; color: inherit; font-size: 16px; line-height: 1;
+  padding: 0 4px; border-radius: 4px; cursor: pointer; opacity: 0; }
+.node:hover .add, .node .add:focus-visible { opacity: .7; }
+.node .add:hover { opacity: 1; background: var(--accent-soft); }
+.node.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.tree.drop-root { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: 8px; }
+@media (hover: none) { .node .add { opacity: .7; } }
+.tree-empty { padding: 16px; color: var(--muted); }
+
+.result { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.result:hover { background: var(--accent-soft); }
+.result .t { font-weight: 600; }
+.result .h { font-size: 12px; color: var(--muted); }
+.result .s { font-size: 13px; }
+mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }

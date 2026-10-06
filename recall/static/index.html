@@ -7,7 +7,16 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6fdf'/><path d='M9 8h9a5 5 0 0 1 0 10h-3l6 6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 8v16' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>">
 <link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)">
 <link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/static/css/base.css">
+<link rel="stylesheet" href="/static/css/layout.css">
+<link rel="stylesheet" href="/static/css/tree.css">
+<link rel="stylesheet" href="/static/css/ask.css">
+<link rel="stylesheet" href="/static/css/markdown.css">
+<link rel="stylesheet" href="/static/css/browse.css">
+<link rel="stylesheet" href="/static/css/dialog.css">
+<link rel="stylesheet" href="/static/css/editor.css">
+<link rel="stylesheet" href="/static/css/graph.css">
 </head>
 <body>
 <header class="topbar">
@@ -240,9 +249,12 @@
 <div id="toast" class="toast" hidden></div>
 
 <script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/marked-footnote.umd.js"></script>
+<script src="/static/vendor/katex/katex.min.js"></script>
+<script src="/static/vendor/marked-katex.umd.js"></script>
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
 <script src="/static/vendor/d3.min.js"></script>
-<script src="/static/app.js"></script>
+<script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

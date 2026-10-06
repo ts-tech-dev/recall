@@ -45,3 +45,10 @@ def test_huge_table_split_repeats_header():
 def test_slugify_matches_previewer():
     assert slugify("Slide 1: Quarterly roadmap") == "slide-1-quarterly-roadmap"
     assert slugify("  Trunk  configuration ") == "trunk-configuration"
+
+
+def test_custom_heading_id_and_image_size():
+    md = "# Guide\n\n## Setup steps {#setup}\n\nRun it. ![Diagram|300](/api/file?path=d.png)\n"
+    c = [x for x in chunk_markdown(md, "Guide") if x.text][0]
+    assert c.anchor == "setup" and c.heading == "Guide > Setup steps"
+    assert c.images == [{"alt": "Diagram", "url": "/api/file?path=d.png"}] and "[image: Diagram]" in c.text

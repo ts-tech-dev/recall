@@ -35,6 +35,13 @@ def test_markdown_obsidian_embed_and_wikilinks(notes, ctx):
     assert "[the router notes](#doc=networking/router.md)" in md
 
 
+def test_markdown_embed_size_kept_for_previewer(notes, ctx):
+    md = rewrite_markdown_links("![[topology.png|300]] ![[topology.png|300x200]] ![[topology.png|Net map]]", ctx,
+                                notes / "backups.md")
+    url = "/api/file?path=networking/topology.png"
+    assert md == f"![topology|300]({url}) ![topology|300x200]({url}) ![Net map]({url})"
+
+
 def test_markdown_code_blocks_untouched(notes, ctx):
     md = extract(notes / "networking/vlans.md", ctx).markdown
     assert 'echo "![fake](nothere.png)"' in md

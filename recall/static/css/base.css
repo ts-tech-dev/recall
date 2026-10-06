@@ -1,0 +1,43 @@
+/* Colors (light/dark), fonts and form controls shared by everything. */
+
+:root {
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --text: #1d2330;
+  --muted: #667085;
+  --border: #e3e6ec;
+  --accent: #2f6fdf;
+  --accent-soft: #e8f0fd;
+  --mark: #fff1a8;
+  --danger: #c62f2f;
+  --code-bg: #f2f4f7;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 2px 8px rgba(16, 24, 40, .05);
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b;
+    --panel: #1a1e26;
+    --text: #e4e7ec;
+    --muted: #98a2b3;
+    --border: #2b313d;
+    --accent: #6a9cf4;
+    --accent-soft: #1f2d48;
+    --mark: #5a4b12;
+    --danger: #f07070;
+    --code-bg: #232833;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column;
+}
+[hidden] { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }

@@ -14,13 +14,13 @@ the most relevant passages instead.
 cd /srv/projects/recall
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...        # optional: or paste the key in Settings
-.venv/bin/python -m recall --notes ~/notes # then open http://127.0.0.1:8765
+.venv/bin/python -m recall --notes ~/notes # then open http://localhost:9999
 ```
 
 If OpenCV fails to import with a `libGL.so.1` error (headless servers), run
 `.venv/bin/pip uninstall -y opencv-python && .venv/bin/pip install opencv-python-headless`.
 
-Options: `--port 8765`, `--host 127.0.0.1`. You can also set or change the notes folder later in **Settings**.
+Options: `--port 9999` (or `RECALL_PORT`), `--host 127.0.0.1`. You can also set or change the notes folder later in **Settings**.
 App data (settings, index, extracted images) lives in `~/.recall` (override with `RECALL_DATA_DIR`).
 The settings file holds your API key and is written with `0600` permissions.
 
@@ -28,7 +28,7 @@ The settings file holds your API key and is written with `0600` permissions.
 
 ```bash
 cp .env.example .env   # set NOTES_DIR, and RECALL_BIND / RECALL_ALLOWED_HOSTS to reach it from other machines
-docker compose up -d --build
+docker compose up -d --build   # then open http://localhost:9999 (RECALL_PORT in .env)
 ```
 
 Notes are mounted at `/notes` and edited as uid 1000. Settings, the index and the embedding model are kept
@@ -44,8 +44,10 @@ powershell -ExecutionPolicy Bypass -File packaging\build-windows.ps1
 ```
 
 This creates `dist\Recall\Recall.exe` (copy the whole `dist\Recall` folder, or `dist\Recall-windows.zip`).
-It opens Recall in its own window (Edge WebView2) and stops the server when you close it. Data is stored in
-`%LOCALAPPDATA%\Recall`, and logs go to `recall.log` there. Set the notes folder in **Settings**, for example `C:\Users\you\Notes`.
+It starts Recall and opens it in your default browser (Edge, Chrome…) at http://localhost:9999. Bookmark that
+address. A tray icon (bottom-right, near the clock) has *Open Recall* and *Quit*. Starting `Recall.exe` again while it
+is running just opens the browser. If port 9999 is taken, set the `RECALL_PORT` environment variable. Data is stored
+in `%LOCALAPPDATA%\Recall`, and logs go to `recall.log` there. Set the notes folder in **Settings**, for example `C:\Users\you\Notes`.
 To run the same launcher from source on any OS, use `python -m recall.desktop`.
 
 ## Features
@@ -57,6 +59,15 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 - **Browse**: file tree with name filter, keyword search with highlighted snippets, and previews:
   rendered Markdown (relative images, Obsidian `![[embeds]]` and `[[wikilinks]]`), the browser's own PDF
   viewer (or a text view), converted Word/PowerPoint/Excel/CSV/HTML, and an outline for longer notes.
+- **Markdown**: GitHub-flavored Markdown (tables, task lists, ~~strikethrough~~, autolinks, raw HTML such as
+  `<details>` and `<kbd>`), plus footnotes (`[^1]`), math (`$…$`, `$$…$$`, ```` ```math ````), Mermaid diagrams
+  (```` ```mermaid ````), Obsidian callouts and GitHub alerts (`> [!note] Title`, foldable with `[!tip]-`),
+  `==highlights==`, `%%comments%%`, `#tags` (click to search), `:emoji:` shortcodes, definition lists
+  (`Term` then `: definition`), image sizes (`![alt|300](pic.png)`, `![[pic.png|300]]`) and heading ids
+  (`## Title {#id}`).
+- **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to
+  the file straight away (with version history, and only if the file hasn't changed on disk since it was shown).
+  In the editor's preview, ticking a box changes the text, which you then save.
 - **AI providers**:
   - Anthropic: default model `claude-opus-5-5`, adjustable effort, and server-side refusal fallback.
   - OpenAI-compatible: OpenAI, or local models through Ollama or LM Studio (set a Base URL such as `http://localhost:11434/v1`).
@@ -90,14 +101,37 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 ## How it works
 
 ```
-file ─► extractors.py ─► Markdown (+ images saved to cache) ─► chunker.py ─► heading-scoped chunks
-                                                                              │ (each remembers its images)
-question ─► index.py (SQLite FTS5, BM25, filters) ─► top chunks + image catalogue ─► answer.py ─► llm.py
+file ─► extractors/ ─► Markdown (+ images saved to cache) ─► chunker.py ─► heading-scoped chunks
+                                                                            │ (each remembers its images)
+question ─► index/ (SQLite FTS5, BM25, filters) ─► top chunks + image catalogue ─► answer.py ─► llm.py
 ```
 
 Every format is normalized to Markdown, so one chunker and one previewer cover every type.
 Each chunk carries the images that appear in it. The AI gets an *image catalogue* of those URLs and
 may embed only those. The browser also removes any answer image that isn't served by Recall.
+
+## Project layout
+
+Each piece lives in its own file, so it can be changed without touching the rest.
+
+| Path | What it does |
+| --- | --- |
+| `recall/__main__.py` | Command line: `python -m recall` |
+| `recall/desktop.py` | Windows app launcher: server + browser + tray icon |
+| `recall/app.py` | Builds the FastAPI app: request guard, routers, static files |
+| `recall/state.py` | Settings, the open index and the folder watcher, shared by the routes |
+| `recall/api/` | HTTP API, one router per area: `status`, `files`, `search`, `edit`, `ask` |
+| `recall/extractors/` | One module per file format (`markdown`, `pdf`, `docx`, `pptx`, `sheets`, `html`); register new ones in `__init__.py` |
+| `recall/index/` | The index: `core` (database, files), `build` (indexing), `search`, `graph`, `query` (filters), `schema` |
+| `recall/chunker.py` | Splits Markdown into heading-scoped chunks |
+| `recall/editing.py` | Saving, versions, new notes, moving files, uploads |
+| `recall/answer.py`, `recall/llm.py` | Retrieval for questions, and the AI providers |
+| `recall/embeddings.py`, `recall/images.py`, `recall/watcher.py` | Smart search, OCR, folder watching |
+| `recall/static/index.html` | The page layout |
+| `recall/static/js/` | Browser code as ES modules, one per area (`main.js` lists them); no build step |
+| `recall/static/js/md/` | Markdown syntax extensions (`extensions.js`) and rendering touches (`enhance.js`) |
+| `recall/static/css/` | Styles, one file per area |
+| `recall/static/vendor/` | Third-party browser libraries (see the README there) |
 
 ## Security notes
 
