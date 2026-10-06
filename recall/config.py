@@ -39,7 +39,9 @@ class Settings:
     max_images: int = 6
     top_k: int = 12
     semantic_search: bool = True  # local embeddings combined with keyword search
-    embed_model: str = "BAAI/bge-small-en-v1.5"
+    embed_model: str = "BAAI/bge-base-en-v1.5"  # ~210 MB; bge-small-en-v1.5 (~70 MB) is faster, less accurate
+    rerank: bool = True  # re-order the best results with a local cross-encoder (better ranking, ~0.5 s per search)
+    rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"  # ~80 MB
     ocr: bool = True  # read text from images and scanned PDF pages
     caption_images: bool = False  # ask the AI to describe images (costs API calls)
     caption_model: str = ""  # blank = same as `model`

@@ -35,6 +35,9 @@ class Index(BuildMixin, SearchMixin, GraphMixin):
         self.versions_dir = base / f"{key}_versions"
         self.embedder = embedder
         self.embed_error = ""
+        # Set by the app: a cross-encoder that re-orders the top results (see recall/rerank.py).
+        self.reranker = None
+        self.rerank_error = ""
         self.ocr = ocr
         self.images = ImageText(self._conn, ocr_enabled=ocr)
         # Set by the app: fn(image_bytes, media_type) -> caption, and the per-run limit.

@@ -21,7 +21,8 @@ export async function refreshStatus() {
   const p = s.progress, ix = s.index;
   const ai = s.settings.ai_enabled ? `AI: ${esc(s.settings.model)}` : "AI off";
   const errs = ix && ix.errors.length ? ` · <span class="err" title="${esc(ix.errors.map(e => e.path + ": " + e.error).join("\n"))}">${ix.errors.length} unreadable</span>` : "";
-  const sem = ix && ix.embed_error ? ` · <span class="err" title="${esc(ix.embed_error)}">smart search off</span>` : "";
+  const sem = (ix && ix.embed_error ? ` · <span class="err" title="${esc(ix.embed_error)}">smart search off</span>` : "") +
+    (ix && ix.rerank_error ? ` · <span class="err" title="${esc(ix.rerank_error)}">re-ranking off</span>` : "");
   el.innerHTML = p && p.running
     ? `${PHASES[p.phase] || "Indexing"} ${p.done}/${p.total}…`
     : `${ix ? ix.docs : 0} notes${ix && ix.images ? ` · ${ix.images} images` : ""} · ${ai}${sem}${errs}${s.watching ? ` · <span title="Watching the folder for changes">live</span>` : ""}`;

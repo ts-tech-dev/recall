@@ -31,7 +31,8 @@ def _normalize(a: np.ndarray) -> np.ndarray:
 class FastEmbedEmbedder(Embedder):
     def __init__(self, model: str = "BAAI/bge-small-en-v1.5"):
         self.name = model
-        # bge-small: unrelated text tops out around 0.55, related passages score ~0.58-0.75
+        # bge-small: unrelated text tops out around 0.55, related passages score ~0.58-0.75;
+        # bge-base separates them more (unrelated up to ~0.48), so the same cutoff works with room to spare.
         self.min_similarity = 0.56 if "bge" in model.lower() else 0.3
         self._model = None
         self._lock = threading.Lock()

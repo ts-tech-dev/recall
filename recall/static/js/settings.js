@@ -5,9 +5,9 @@ import { state } from "./state.js";
 import { refreshStatus } from "./status.js";
 import { loadTree } from "./tree.js";
 
-export const TEXT_SETTINGS = ["notes_dir", "provider", "model", "base_url", "effort", "max_images", "top_k", "embed_model",
+export const TEXT_SETTINGS = ["notes_dir", "provider", "model", "base_url", "effort", "max_images", "top_k", "embed_model", "rerank_model",
   "caption_model", "caption_limit"];
-export const BOOL_SETTINGS = ["send_images", "semantic_search", "ocr", "watch", "caption_images"];
+export const BOOL_SETTINGS = ["send_images", "semantic_search", "rerank", "ocr", "watch", "caption_images"];
 
 export function openSettings() {
   const f = $("#settings-form"), s = state.status?.settings || {};
@@ -18,6 +18,7 @@ export function openSettings() {
     feat.semantic === false && "Smart search needs the fastembed package (pip install fastembed).",
     feat.ocr === false && "OCR needs the rapidocr-onnxruntime package.",
     ix?.embed_error && `Smart search error: ${ix.embed_error}`,
+    ix?.rerank_error && `Re-ranking error: ${ix.rerank_error}`,
   ].filter(Boolean).join(" ");
   f.elements.api_key.value = "";
   f.elements.clear_api_key.checked = false;
@@ -40,7 +41,8 @@ export async function saveSettings(ev) {
   for (const k of TEXT_SETTINGS) body[k] = e[k].value.trim();
   for (const k of BOOL_SETTINGS) body[k] = e[k].checked;
   for (const k of ["max_images", "top_k", "caption_limit"]) body[k] = +body[k] || 0;
-  if (!body.embed_model) body.embed_model = "BAAI/bge-small-en-v1.5";
+  if (!body.embed_model) body.embed_model = "BAAI/bge-base-en-v1.5";
+  if (!body.rerank_model) body.rerank_model = "Xenova/ms-marco-MiniLM-L-6-v2";
   if (!body.model) body.model = body.provider === "anthropic" ? "claude-opus-5-5" : "";
   try {
     await api("/api/settings", { method: "POST", headers: H, body: JSON.stringify(body) });

@@ -61,10 +61,61 @@ def test_markdown_external_links_untouched(notes, ctx):
 def test_pdf_pages_text_and_images(notes, ctx):
     d = extract(notes / "k8s-upgrade.pdf", ctx)
     assert d.title == "K8s Upgrade"
-    assert "## Page 1" in d.markdown and "## Page 2" in d.markdown
+    # The larger-font first line becomes a section anchored to its page; page 2 continues inside it.
+    assert "## Kubernetes cluster upgrade procedure {#page-1}" in d.markdown and "### Page 2" in d.markdown
     assert "Drain each node" in d.markdown and "etcd snapshot" in d.markdown
     imgs = cached_images(ctx, d.markdown)
     assert len(imgs) == 1 and imgs[0].is_file() and imgs[0].stat().st_size > 0
+
+
+def _manual_pdf(path, outline=True):
+    """Three pages with a running header/footer, section titles and a ruled table on page 2."""
+    import pymupdf as fitz
+
+    doc = fitz.open()
+    sections = ["Installing the agent", "Network ports", "Uninstalling"]
+    for i, title in enumerate(sections, 1):
+        p = doc.new_page()
+        p.insert_text((72, 30), "Acme Guide - Confidential", fontsize=8)
+        p.insert_text((72, p.rect.height - 25), f"Page {i} of 3", fontsize=8)
+        p.insert_text((72, 90), title, fontsize=18)
+        p.insert_text((72, 130), f"Body text about {title.lower()} goes here.", fontsize=11)
+        if i == 2:
+            for r, row in enumerate([["Port", "Use"], ["443", "Console"], ["8443", "Gateway"]]):
+                for c, cell in enumerate(row):
+                    box = fitz.Rect(72 + c * 120, 160 + r * 22, 192 + c * 120, 182 + r * 22)
+                    p.draw_rect(box, color=(0, 0, 0), width=0.6)
+                    p.insert_text((box.x0 + 4, box.y1 - 6), cell, fontsize=10)
+    if outline:
+        doc.set_toc([[1, t, i] for i, t in enumerate(sections, 1)])
+    doc.save(path)
+    doc.close()
+
+
+def test_pdf_sections_from_outline_tables_and_running_headers(tmp_path, ctx):
+    _manual_pdf(tmp_path / "guide.pdf")
+    md = extract(tmp_path / "guide.pdf", ctx).markdown
+    assert "## Installing the agent {#page-1}" in md and "## Network ports {#page-2}" in md
+    assert "Confidential" not in md and "of 3" not in md  # running header/footer dropped
+    assert "| Port | Use |\n| --- | --- |\n| 443 | Console |\n| 8443 | Gateway |" in md
+    assert md.count("| 443 |") == 1 and "443 Console" not in md  # table cells aren't repeated as text
+
+
+def test_pdf_sections_from_font_sizes_without_outline(tmp_path, ctx):
+    _manual_pdf(tmp_path / "guide.pdf", outline=False)
+    md = extract(tmp_path / "guide.pdf", ctx).markdown
+    assert "## Network ports {#page-2}" in md and "## Uninstalling {#page-3}" in md
+
+
+def test_pdf_without_structure_keeps_page_sections(tmp_path, ctx):
+    import pymupdf as fitz
+
+    doc = fitz.open()
+    for i in range(2):
+        doc.new_page().insert_text((72, 90), f"Plain page {i + 1} text.", fontsize=11)
+    doc.save(tmp_path / "plain.pdf")
+    md = extract(tmp_path / "plain.pdf", ctx).markdown
+    assert "## Page 1" in md and "## Page 2" in md
 
 
 def test_docx_headings_lists_tables_images(notes, ctx):

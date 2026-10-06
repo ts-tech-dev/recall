@@ -74,10 +74,15 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
   - None: shows the retrieved passages, no AI call.
 
   With *Send note images to the AI* on, the top images are attached so the model can judge which ones are relevant.
-- **Smart search (by meaning)**: a local embedding model (`BAAI/bge-small-en-v1.5`, about 70 MB, downloaded
+- **Smart search (by meaning)**: a local embedding model (`BAAI/bge-base-en-v1.5`, about 210 MB, downloaded
   once, CPU only) finds passages that mean the same thing even without shared words. For example, "power outage
-  protection" finds a note about a UPS battery. Results are merged with keyword ranking. The sidebar search has
-  *Smart*, *Exact* and *Meaning* modes.
+  protection" finds a note about a UPS battery. Results are merged with keyword ranking, then a local re-ranking
+  model (`ms-marco-MiniLM-L-6-v2`, about 80 MB) reads the question with each top passage and puts the best
+  answers first (about half a second per search; it can be turned off in Settings). The sidebar search has
+  *Smart*, *Exact* and *Meaning* modes. *Exact* skips re-ranking. Ask uses the same search.
+- **PDF structure**: PDFs are split into their own sections (from the bookmarks, or from headings set in a larger
+  font), so section titles help search and results say "4.2 Installing the agent" instead of "Page 37". Each
+  result still opens the PDF at its page. Running headers and footers are dropped, and ruled tables become tables.
 - **Text in images**: OCR (local RapidOCR) reads screenshots, diagrams and scanned PDF pages. That text becomes
   searchable and is passed to the AI with the passage the image belongs to. Images that sit loose in the folder
   become searchable on their own. Optional **AI captions** describe each image once and are cached by image content.
@@ -126,7 +131,8 @@ Each piece lives in its own file, so it can be changed without touching the rest
 | `recall/chunker.py` | Splits Markdown into heading-scoped chunks |
 | `recall/editing.py` | Saving, versions, new notes, moving files, uploads |
 | `recall/answer.py`, `recall/llm.py` | Retrieval for questions, and the AI providers |
-| `recall/embeddings.py`, `recall/images.py`, `recall/watcher.py` | Smart search, OCR, folder watching |
+| `recall/embeddings.py`, `recall/rerank.py` | Local models for search by meaning and re-ranking |
+| `recall/images.py`, `recall/watcher.py` | OCR, folder watching |
 | `recall/static/index.html` | The page layout |
 | `recall/static/js/` | Browser code as ES modules, one per area (`main.js` lists them); no build step |
 | `recall/static/js/md/` | Markdown syntax extensions (`extensions.js`) and rendering touches (`enhance.js`) |
@@ -151,13 +157,14 @@ The fixtures generate a sample notes folder covering every file type, with image
 
 | File | What it tests |
 |---|---|
-| `test_extractors.py` | Each file type, Obsidian syntax, traversal safety |
+| `test_extractors.py` | Each file type, Obsidian syntax, traversal safety, PDF sections, tables and running headers |
 | `test_chunker.py` | Sections, code fences, images per chunk, splitting long text and tables |
 | `test_index.py` | Incremental and full builds, search for each type, every filter and combinations, FTS-injection safety |
 | `test_answer.py` | Retrieval, prompt, image catalogue, vision blocks, local answers, fake providers, and the real Anthropic SDK against a mocked HTTP transport |
 | `test_config.py` | Key masking and file permissions, validation |
 | `test_api.py` | Every endpoint, previews for each type, SSE streaming, security guards |
 | `test_semantic.py` | Real embedding model: meaning-only matches, hybrid fusion, filters, no re-embedding, model change, failure fallback |
+| `test_rerank.py` | Re-ranking order, *Exact* mode untouched, fallback when the model fails, Settings switch |
 | `test_images.py` | OCR (images, scanned PDFs, cache), loose versus embedded images, captions (folding, limit, failure, refusal) |
 | `test_watcher.py` | Create, modify and delete picked up live; bursts debounced; hidden files ignored |
 | `test_graph.py` | Links and backlinks, updates after edits, dangling links, graph nodes and edges, similarity edges |

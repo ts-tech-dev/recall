@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 
 import numpy as np
 
 from .query import HL_END, HL_START, RRF_K, Filters, build_match_query
+
+log = logging.getLogger("recall.index")
+
+# The cross-encoder re-orders the best fused results plus the best of each list on its own, so a passage
+# that only one method found (e.g. a paraphrase only the embeddings matched) still gets a fair look.
+RERANK_FUSED = 20
+RERANK_PER_LIST = 15
+RERANK_CHARS = 1500  # passage text given to the cross-encoder (it reads ~512 tokens)
 
 
 class SearchMixin:
@@ -24,7 +33,8 @@ class SearchMixin:
             by_type = {r[0]: r[1] for r in c.execute("SELECT ext, COUNT(*) FROM docs WHERE kind='note' GROUP BY ext")}
         return {"docs": docs, "images": images, "chunks": chunks, "vectors": vectors, "captions": captions,
                 "errors": errors, "by_type": by_type, "version": self.version,
-                "semantic": bool(self.embedder) and not self.embed_error, "embed_error": self.embed_error}
+                "semantic": bool(self.embedder) and not self.embed_error, "embed_error": self.embed_error,
+                "rerank": bool(self.reranker) and not self.rerank_error, "rerank_error": self.rerank_error}
 
     @staticmethod
     def _filter_sql(filters: Filters) -> tuple[list[str], list]:
@@ -124,6 +134,9 @@ class SearchMixin:
                     m.setdefault("similarity", r.get("similarity"))
                 m["rrf"] += 1.0 / (RRF_K + rank + 1)
         ranked = sorted(merged.values(), key=lambda r: -r["rrf"])
+        if mode != "keyword":
+            ranked = self._rerank(q, ranked, [r["id"] for r in kw[:RERANK_PER_LIST]] +
+                                  [r["id"] for r in sem[:RERANK_PER_LIST]])
         out, per = [], {}
         for r in ranked:
             if per_doc and per.get(r["path"], 0) >= per_doc:
@@ -135,6 +148,23 @@ class SearchMixin:
             if len(out) >= limit:
                 break
         return out
+
+    def _rerank(self, q: str, ranked: list[dict], also: list[int]) -> list[dict]:
+        """Re-order the candidates with the cross-encoder; everything else keeps its fused order after them."""
+        if not self.reranker or not q.strip() or len(ranked) < 2:
+            return ranked
+        pick = {r["id"] for r in ranked[:RERANK_FUSED]} | set(also)
+        top = [r for r in ranked if r["id"] in pick]
+        try:
+            scores = self.reranker.score(q, [f"{r['title']}\n{r['heading']}\n{r['text']}"[:RERANK_CHARS] for r in top])
+            self.rerank_error = ""
+        except Exception as e:
+            self.rerank_error = f"{type(e).__name__}: {e}"
+            log.warning("Re-ranking failed: %s", self.rerank_error)
+            return ranked
+        for r, s in zip(top, scores):
+            r["rerank"] = round(s, 3)
+        return sorted(top, key=lambda r: -r["rerank"]) + [r for r in ranked if r["id"] not in pick]
 
     def doc_info(self, rel: str) -> dict | None:
         with self._conn() as c:

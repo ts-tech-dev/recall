@@ -6,6 +6,7 @@ from .. import __version__
 from ..config import apply_update, save_settings
 from ..embeddings import available as embeddings_available
 from ..images import ocr_available
+from ..rerank import available as rerank_available
 from ..index import TYPE_GROUPS, Index
 from ..state import State, get_index, get_state
 
@@ -23,7 +24,7 @@ def status(state: State = Depends(get_state)):
         "progress": idx.progress if idx else None,
         "changed": idx.last_changed[:50] if idx else [],
         "watching": bool(state.watcher),
-        "features": {"semantic": embeddings_available(), "ocr": ocr_available()},
+        "features": {"semantic": embeddings_available(), "ocr": ocr_available(), "rerank": rerank_available()},
         "type_groups": TYPE_GROUPS,
     }
 

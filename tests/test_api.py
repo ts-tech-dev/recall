@@ -18,7 +18,7 @@ def client(data):
 
 @pytest.fixture()
 def ready(client, notes):
-    r = client.post("/api/settings", json={"notes_dir": str(notes), "provider": "none", "semantic_search": False,
+    r = client.post("/api/settings", json={"notes_dir": str(notes), "provider": "none", "semantic_search": False, "rerank": False,
                                            "ocr": False}, headers=H)
     assert r.status_code == 200
     r = client.post("/api/index?wait=true", headers=H)

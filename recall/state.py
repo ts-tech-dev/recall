@@ -11,6 +11,8 @@ from fastapi import HTTPException, Request
 from .config import data_dir, load_settings
 from .embeddings import FastEmbedEmbedder
 from .embeddings import available as embeddings_available
+from .rerank import FastEmbedReranker
+from .rerank import available as rerank_available
 from .images import ocr_available
 from .index import Index
 from .llm import caption_image
@@ -26,6 +28,7 @@ class State:
         self.lock = threading.RLock()
         self._signature = None
         self._embedders: dict[str, FastEmbedEmbedder] = {}
+        self._rerankers: dict[str, FastEmbedReranker] = {}
 
     def _embedder(self):
         s = self.settings
@@ -34,6 +37,14 @@ class State:
         if s.embed_model not in self._embedders:
             self._embedders[s.embed_model] = FastEmbedEmbedder(s.embed_model)
         return self._embedders[s.embed_model]
+
+    def _reranker(self):
+        s = self.settings
+        if not s.rerank or not rerank_available():
+            return None
+        if s.rerank_model not in self._rerankers:
+            self._rerankers[s.rerank_model] = FastEmbedReranker(s.rerank_model)
+        return self._rerankers[s.rerank_model]
 
     def _captioner(self):
         s = self.settings
@@ -63,6 +74,9 @@ class State:
                     self.watcher = Watcher(self.index)
                     self.watcher.start()
             self.index.captioner = self._captioner()
+            reranker = self._reranker()
+            if reranker is not self.index.reranker:
+                self.index.reranker, self.index.rerank_error = reranker, ""
             self.index.caption_limit = s.caption_limit
             return self.index
 

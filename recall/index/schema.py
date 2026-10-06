@@ -1,6 +1,6 @@
 """SQLite schema of the index. Bump SCHEMA_VERSION when it changes; REBUILT_TABLES are then recreated."""
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"  # 3: PDF sections, tables and running headers (re-extract everything)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
