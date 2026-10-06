@@ -99,6 +99,7 @@
           <div class="doc-actions">
             <button class="btn ghost small" id="doc-pdf-toggle" hidden>Text view</button>
             <button class="btn small" id="doc-edit" hidden>Edit</button>
+            <button class="btn ghost small" id="doc-move" title="Move to another folder (or drag it in the file list)">Move…</button>
             <button class="btn ghost small" id="doc-ask">Ask about this note</button>
             <a class="btn ghost small" id="doc-raw" target="_blank" rel="noopener">Open original</a>
           </div>
@@ -206,6 +207,31 @@
     <div class="dialog-actions">
       <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
       <button class="btn primary" id="settings-save" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Pick a folder: for a new note, or to move a file -->
+<dialog id="place">
+  <form method="dialog" id="place-form">
+    <h2 id="place-title"></h2>
+    <label>Folder
+      <select name="folder" id="place-folder"></select>
+    </label>
+    <button type="button" class="btn ghost small" id="place-newdir-btn">+ New folder</button>
+    <label id="place-newdir-row" hidden>New folder
+      <input name="newdir" autocomplete="off" placeholder="e.g. projects/2026">
+      <span class="hint" id="place-newdir-hint"></span>
+    </label>
+    <label id="place-name-row">Note name
+      <input name="name" autocomplete="off" placeholder="untitled">
+      <span class="hint">.md is added if you leave out the extension.</span>
+    </label>
+    <p class="hint" id="place-dest"></p>
+    <p class="error" id="place-error"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="place-cancel">Cancel</button>
+      <button class="btn primary" id="place-ok"></button>
     </div>
   </form>
 </dialog>

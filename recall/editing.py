@@ -1,4 +1,4 @@
-"""Editing notes in place: conflict-checked atomic saves, version history, new notes, image uploads."""
+"""Editing notes in place: conflict-checked atomic saves, version history, new notes, moves, image uploads."""
 
 from __future__ import annotations
 
@@ -8,8 +8,13 @@ import re
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import quote, unquote
+
+from .extractors import EXTERNAL_RE, HTML_IMG_RE, MD_IMAGE_RE, MD_LINK_RE, _split_code
+from .index import SKIP_DIRS
 
 EDITABLE_EXTS = {".md", ".markdown", ".txt"}
+MARKDOWN_EXTS = {".md", ".markdown"}
 UPLOAD_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 MAX_NOTE_BYTES = 5_000_000
 MAX_UPLOAD_BYTES = 25_000_000
@@ -131,6 +136,120 @@ def create_note(root: Path, rel: str, title: str = "") -> dict:
     body = f"# {title}\n\n" if p.suffix.lower() != ".txt" else ""
     _atomic_write(p, body.encode())
     return {"path": p.relative_to(root.resolve()).as_posix(), "mtime_ns": stamp(p)}
+
+
+def _walk(root: Path):
+    """Yield (folder, filenames) for every visible folder under root, skipping hidden and tool folders."""
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d not in SKIP_DIRS)
+        yield Path(dirpath), [f for f in filenames if not f.startswith(".")]
+
+
+def list_folders(root: Path) -> list[str]:
+    """Every folder under the notes root (including empty ones), as paths relative to it."""
+    root = root.resolve()
+    return [d.relative_to(root).as_posix() for d, _ in _walk(root) if d != root]
+
+
+def _folder(root: Path, rel: str) -> Path:
+    """The notes root for "" (top level), otherwise a folder inside it."""
+    rel = rel.strip().strip("/")
+    return root.resolve() if not rel else inside(root, rel)
+
+
+def _retarget(md: str, root: Path, base_old: Path, base_new: Path, moved: tuple[Path, Path]) -> str:
+    """Rewrite relative link/image targets in `md` so they still point at the same files.
+
+    `base_old`/`base_new` are the note's folder before and after a move (equal for notes that only link
+    to the moved file); links to `moved[0]` are pointed at `moved[1]`. Broken and external links are kept.
+    """
+    old, new = moved
+
+    def fix(target: str) -> str | None:
+        if EXTERNAL_RE.match(target):
+            return None
+        path, suffix = re.match(r"([^#?]*)(.*)", target, re.S).groups()  # keep #anchor / ?query
+        if not path:
+            return None
+        absolute = path.startswith("/")
+        try:
+            dest = ((root / unquote(path).lstrip("/")) if absolute else (base_old / unquote(path))).resolve()
+        except OSError:
+            return None
+        if dest == old:
+            dest = new
+        elif base_old == base_new or absolute or not dest.exists():
+            return None
+        rel = Path(os.path.relpath(dest, root if absolute else base_new)).as_posix()
+        rel = "/" + rel if absolute else rel
+        if "%" in path or " " in rel:
+            rel = quote(rel, safe="/")
+        return rel + suffix if rel + suffix != target else None
+
+    parts = []
+    for is_code, seg in _split_code(md):
+        if not is_code:
+            spans = {}
+            for rx, g in ((MD_IMAGE_RE, 2), (MD_LINK_RE, 2), (HTML_IMG_RE, 3)):
+                for m in rx.finditer(seg):
+                    spans[m.span(g)] = m.group(g)
+            for (a, b), target in sorted(spans.items(), reverse=True):
+                repl = fix(target)
+                if repl is not None:
+                    seg = seg[:a] + repl + seg[b:]
+        parts.append(seg)
+    return "".join(parts)
+
+
+def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
+    """Move a file into another folder (created if needed), keeping relative links working.
+
+    Links inside a moved Markdown note are rewritten for its new location, and relative links to the file
+    from other Markdown notes are updated. Wiki links ([[name]]) find notes by name, so they need no change.
+    """
+    root = root.resolve()
+    src = inside(root, rel)
+    if not src.is_file():
+        raise EditError("File not found", 404)
+    dest_dir = _folder(root, folder)
+    dest = dest_dir / src.name
+    if dest == src:
+        raise EditError("The file is already in that folder")
+    if dest.exists():
+        raise EditError(f"{dest.relative_to(root).as_posix()} already exists", 409)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    os.replace(src, dest)
+    new_rel = dest.relative_to(root).as_posix()
+
+    if dest.suffix.lower() in MARKDOWN_EXTS:
+        text = dest.read_text(encoding="utf-8", errors="replace")
+        fixed = _retarget(text, root, src.parent, dest_dir, (src, dest))
+        if fixed != text:
+            _atomic_write(dest, fixed.encode("utf-8"))
+
+    updated = []
+    needles = {src.name, quote(src.name)}
+    for d, files in _walk(root):
+        for f in files:
+            p = d / f
+            if p == dest or p.suffix.lower() not in MARKDOWN_EXTS:
+                continue
+            try:
+                text = p.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if not any(n in text for n in needles):
+                continue
+            fixed = _retarget(text, root, d, d, (src, dest))
+            if fixed != text:
+                _atomic_write(p, fixed.encode("utf-8"))
+                updated.append(p.relative_to(root).as_posix())
+
+    old_vd, new_vd = _version_dir(versions_root, src.relative_to(root).as_posix()), _version_dir(versions_root, new_rel)
+    if old_vd.is_dir() and not new_vd.exists():
+        old_vd.rename(new_vd)
+        (new_vd / "path.txt").write_text(new_rel)
+    return {"path": new_rel, "updated": sorted(updated)}
 
 
 def _safe_name(name: str) -> str:

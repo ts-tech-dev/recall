@@ -78,6 +78,55 @@ def test_upload_next_to_note(notes):
         editing.save_upload(notes, "networking/vlans.md", "script.js", b"alert(1)")
 
 
+def test_list_folders_includes_empty(notes):
+    (notes / "empty" / "deeper").mkdir(parents=True)
+    folders = editing.list_folders(notes)
+    assert {"networking", "images", "empty", "empty/deeper"} <= set(folders)
+    assert not any(f.startswith(".") for f in folders)
+
+
+def test_move_note_keeps_its_links(notes, tmp_path):
+    r = editing.move_file(notes, tmp_path / "v", "networking/vlans.md", "guides/net")
+    assert r["path"] == "guides/net/vlans.md" and not (notes / "networking/vlans.md").exists()
+    text = (notes / "guides/net/vlans.md").read_text()
+    assert "](../../images/vlan-diagram.png)" in text
+    assert "[the router notes](../../networking/router.md)" in text
+    assert "[[backups]]" in text and "![[topology.png]]" in text  # found by name, unchanged
+    assert 'echo "![fake](nothere.png)"' in text  # code untouched
+
+
+def test_move_updates_links_to_the_file(notes, tmp_path):
+    (notes / "index.md").write_text(
+        "See [VLANs](networking/vlans.md#trunk-configuration), ![t](<networking/topology.png>) "
+        "and [web](https://example.com/networking/vlans.md).\n\n```\n[code](networking/vlans.md)\n```\n")
+    r = editing.move_file(notes, tmp_path / "v", "networking/vlans.md", "")
+    assert r == {"path": "vlans.md", "updated": ["index.md"]}
+    text = (notes / "index.md").read_text()
+    assert "[VLANs](vlans.md#trunk-configuration)" in text
+    assert "](<networking/topology.png>)" in text and "https://example.com/networking/vlans.md" in text
+    assert "[code](networking/vlans.md)" in text
+    editing.move_file(notes, tmp_path / "v", "networking/topology.png", "images/net diagrams")
+    assert "![t](<images/net%20diagrams/topology.png>)" in (notes / "index.md").read_text()
+
+
+def test_move_carries_version_history(notes, tmp_path):
+    v = tmp_path / "v"
+    editing.save_source(notes, v, "backups.md", "edited", None)
+    editing.move_file(notes, v, "backups.md", "archive")
+    assert editing.list_versions(v, "backups.md") == []
+    assert len(editing.list_versions(v, "archive/backups.md")) == 1
+
+
+@pytest.mark.parametrize("rel,folder,status", [
+    ("backups.md", "", 400), ("networking/router.md", "", 409), ("missing.md", "x", 404),
+    ("backups.md", "../outside", 400), ("backups.md", "networking/../..", 400), ("backups.md", ".hidden", 400)])
+def test_move_refusals(notes, tmp_path, rel, folder, status):
+    (notes / "router.md").write_text("# Another router")
+    with pytest.raises(EditError) as e:
+        editing.move_file(notes, tmp_path / "v", rel, folder)
+    assert e.value.status == status
+
+
 # ------------------------------------------------------------------ API
 
 
@@ -144,3 +193,13 @@ def test_version_stamp_survives_json_numbers(notes, tmp_path):
     assert isinstance(src["mtime_ns"], str)
     roundtrip = json.loads(json.dumps(src))["mtime_ns"]
     assert editing.save_source(notes, tmp_path / "v", "backups.md", "x", roundtrip)["changed"]
+
+
+def test_api_folders_and_move(api, notes):
+    assert "networking" in api.get("/api/folders").json()["folders"]
+    r = api.post("/api/move", json={"path": "backups.md", "folder": "archive"}, headers=H)
+    assert r.status_code == 200 and r.json()["path"] == "archive/backups.md"
+    assert "networking/vlans.md" not in r.json()["updated"]  # [[backups]] is a wiki link: found by name
+    api.post("/api/index?wait=true", headers=H)
+    assert api.get("/api/doc", params={"path": "archive/backups.md"}).status_code == 200
+    assert api.post("/api/move", json={"path": "archive/backups.md", "folder": "archive"}, headers=H).status_code == 400

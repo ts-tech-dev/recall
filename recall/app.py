@@ -55,6 +55,11 @@ class NewNoteBody(BaseModel):
     title: str = ""
 
 
+class MoveBody(BaseModel):
+    path: str
+    folder: str
+
+
 class RenderBody(BaseModel):
     path: str
     markdown: str
@@ -205,18 +210,21 @@ def create_app(auto_index: bool = True) -> FastAPI:
         idx = state.require_index()
         root: dict = {"name": idx.root.name, "path": "", "type": "dir", "children": []}
         dirs = {"": root}
+
+        def folder(key: str) -> dict:
+            if key not in dirs:
+                parent, _, name = key.rpartition("/")
+                dirs[key] = {"name": name, "path": key, "type": "dir", "children": []}
+                folder(parent)["children"].append(dirs[key])
+            return dirs[key]
+
+        for key in editing.list_folders(idx.root):  # empty folders too, so notes can be moved or created there
+            if not any(not e.name.startswith(".") for e in os.scandir(idx.root / key)):
+                folder(key)
         for p in idx.iter_files(include_images=images):
             rel = p.relative_to(idx.root).as_posix()
-            parts = rel.split("/")
-            parent = root
-            for i in range(len(parts) - 1):
-                key = "/".join(parts[: i + 1])
-                if key not in dirs:
-                    node = {"name": parts[i], "path": key, "type": "dir", "children": []}
-                    dirs[key] = node
-                    parent["children"].append(node)
-                parent = dirs[key]
-            parent["children"].append({"name": parts[-1], "path": rel, "type": "file", "ext": p.suffix.lower()})
+            parent, _, name = rel.rpartition("/")
+            folder(parent)["children"].append({"name": name, "path": rel, "type": "file", "ext": p.suffix.lower()})
 
         def sort(n):
             n["children"].sort(key=lambda c: (c["type"] != "dir", c["name"].lower()))
@@ -311,6 +319,17 @@ def create_app(auto_index: bool = True) -> FastAPI:
     def new_note(body: NewNoteBody):
         idx = state.require_index()
         res = edit_call(editing.create_note, idx.root, body.path, body.title)
+        state.reindex_async(wait_turn=True)
+        return res
+
+    @app.get("/api/folders")
+    def folders():
+        return {"folders": editing.list_folders(state.require_index().root)}
+
+    @app.post("/api/move")
+    def move(body: MoveBody):
+        idx = state.require_index()
+        res = edit_call(editing.move_file, idx.root, idx.versions_dir, body.path, body.folder)
         state.reindex_async(wait_turn=True)
         return res
 

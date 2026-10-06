@@ -79,7 +79,11 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 - **Editing**: edit Markdown and text notes with a live preview. Paste, drop or pick images and they are saved next
   to the note and linked automatically. Ctrl+S saves. If the file changed on disk since you opened it, you're
   asked before anything is overwritten. The last 30 versions of each note are kept (*History…*). *+ Note*
-  creates a new note.
+  creates a new note: pick the folder from a list, or make a new one. The **+** next to a folder in the file
+  list creates the note in that folder.
+- **Moving files**: drag a file onto a folder in the file list, or onto empty space for the top level, or use
+  *Move…* on the open note. Relative links and images inside a moved note are updated, and so are relative
+  links to it from other notes. `[[Wiki links]]` find notes by name, so they keep working.
 - **Incremental indexing**: only new or changed files are re-read, OCR'd and embedded. Unreadable files are listed
   in the status bar.
 
@@ -123,6 +127,6 @@ The fixtures generate a sample notes folder covering every file type, with image
 | `test_images.py` | OCR (images, scanned PDFs, cache), loose versus embedded images, captions (folding, limit, failure, refusal) |
 | `test_watcher.py` | Create, modify and delete picked up live; bursts debounced; hidden files ignored |
 | `test_graph.py` | Links and backlinks, updates after edits, dangling links, graph nodes and edges, similarity edges |
-| `test_editing.py` | Save, conflict and force, versions, unsafe paths, new notes, image uploads, timestamp precision, API flow |
+| `test_editing.py` | Save, conflict and force, versions, unsafe paths, new notes, moves and link updates, folders, image uploads, timestamp precision, API flow |
 
 See `PLAN.md` for the design and roadmap.

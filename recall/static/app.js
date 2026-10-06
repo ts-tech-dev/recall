@@ -210,11 +210,11 @@ function renderTree() {
         const inner = build(c);
         if (!inner && filter) continue;
         const cls = !filter && collapsed.includes(c.path) ? "dir collapsed" : "dir";
-        items.push(`<li class="${cls}" data-dir="${esc(c.path)}"><div class="node" role="treeitem"><span class="ico chev" aria-hidden="true"></span><span class="name">${esc(c.name)}</span></div>${inner || "<ul></ul>"}</li>`);
+        items.push(`<li class="${cls}" data-dir="${esc(c.path)}"><div class="node" role="treeitem"><span class="ico chev" aria-hidden="true"></span><span class="name">${esc(c.name)}</span><button class="add" data-add="${esc(c.path)}" title="New note in ${esc(c.path)}" aria-label="New note in ${esc(c.path)}">+</button></div>${inner || "<ul></ul>"}</li>`);
       } else {
         if (filter && !c.path.toLowerCase().includes(filter)) continue;
         const active = state.currentDoc === c.path ? " active" : "";
-        items.push(`<li><div class="node${active}" role="treeitem" data-path="${esc(c.path)}" title="${esc(c.path)}"><span class="ico badge b-${ICONS[c.ext] || "img"}" aria-hidden="true">${ICONS[c.ext] || "img"}</span><span class="name">${esc(c.name)}</span></div></li>`);
+        items.push(`<li><div class="node${active}" role="treeitem" draggable="true" data-path="${esc(c.path)}" title="${esc(c.path)}"><span class="ico badge b-${ICONS[c.ext] || "img"}" aria-hidden="true">${ICONS[c.ext] || "img"}</span><span class="name">${esc(c.name)}</span></div></li>`);
       }
     }
     return items.length ? `<ul>${items.join("")}</ul>` : "";
@@ -577,18 +577,129 @@ function insertAtCursor(ta, text) {
   ta.dispatchEvent(new Event("input"));
 }
 
-async function newNote() {
+// ------------------------------------------------------------------ new note / move
+
+const folderOf = path => path.includes("/") ? path.replace(/\/[^/]*$/, "") : "";
+const joinPath = (...parts) => parts.map(p => p.replace(/^\/+|\/+$/g, "")).filter(Boolean).join("/");
+const withExt = name => /\.[^./]+$/.test(name) ? name : name + ".md";
+const folderLabel = folder => folder ? folder.replaceAll("/", " / ") : "(top level)";
+
+/**
+ * Show the folder picker. `action({folder, name})` runs on OK; if it throws, the error is shown and the
+ * dialog stays open. `withName` adds a note name field; `file` is the name of a file being moved.
+ */
+async function pickPlace({ title, ok, folder = "", withName = false, file = "", action }) {
+  let folders;
+  try { folders = (await api("/api/folders")).folders; } catch (e) { toast(e.message); return; }
+  const dlg = $("#place"), f = $("#place-form"), sel = $("#place-folder");
+  $("#place-title").textContent = title;
+  $("#place-ok").textContent = ok;
+  sel.innerHTML = ["", ...folders].map(d => `<option value="${esc(d)}">${esc(folderLabel(d))}</option>`).join("");
+  sel.value = folders.includes(folder) ? folder : "";
+  f.elements.newdir.value = f.elements.name.value = "";
+  $("#place-newdir-row").hidden = true; $("#place-newdir-btn").hidden = false;
+  $("#place-name-row").hidden = !withName;
+  $("#place-error").textContent = "";
+
+  const target = () => joinPath(sel.value, f.elements.newdir.value.trim());
+  const update = () => {
+    $("#place-newdir-hint").textContent = `Created inside ${folderLabel(sel.value)}.`;
+    const name = withName ? withExt(f.elements.name.value.trim() || "untitled") : file;
+    $("#place-dest").textContent = `${withName ? "Saves as" : "New location:"} ${joinPath(target(), name)}`;
+    $("#place-error").textContent = "";
+  };
+  f.oninput = f.onchange = update;
+  $("#place-newdir-btn").onclick = () => {
+    $("#place-newdir-row").hidden = false; $("#place-newdir-btn").hidden = true;
+    f.elements.newdir.focus(); update();
+  };
+  $("#place-cancel").onclick = () => dlg.close();
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const name = f.elements.name.value.trim();
+    if (withName && !name) { $("#place-error").textContent = "Give the note a name."; return; }
+    try { await action({ folder: target(), name }); dlg.close(); }
+    catch (err) { $("#place-error").textContent = err.message; }
+  };
+  dlg.showModal();
+  (withName ? f.elements.name : sel).focus();
+  update();
+}
+
+async function newNote(folder) {
   if (!state.status?.notes_dir) return openSettings();
-  const folder = state.currentDoc && state.currentDoc.includes("/") ? state.currentDoc.replace(/\/[^/]*$/, "/") : "";
-  const path = prompt("New note path (relative to your notes folder):", folder + "untitled.md");
+  if (state.editing && !confirmLeaveEditor()) return;
+  let last = "";
+  try { last = localStorage.getItem("noteFolder") || ""; } catch {}
+  pickPlace({
+    title: "New note", ok: "Create", withName: true,
+    folder: folder ?? (state.currentDoc ? folderOf(state.currentDoc) : last),
+    action: async ({ folder, name }) => {
+      const r = await api("/api/note", { method: "POST", headers: H, body: JSON.stringify({ path: joinPath(folder, withExt(name)) }) });
+      try { localStorage.setItem("noteFolder", folder); } catch {}
+      closeEditor();
+      await loadTree();
+      openEditor(r.path);
+    },
+  });
+}
+
+/** Move a file to another folder; the server keeps relative links to and from it working. */
+async function moveFile(path, folder) {
+  if (state.editing?.path === path) throw new Error("Close the editor before moving this note.");
+  const r = await api("/api/move", { method: "POST", headers: H, body: JSON.stringify({ path, folder }) });
+  if (state.scopePath === path) setScope(r.path);
+  if (state.currentDoc === path) openDoc(r.path, "", { force: true });
+  await loadTree();
+  const n = r.updated.length;
+  toast(`Moved to ${folder || "the top level"}` + (n ? ` · updated links in ${n} note${n > 1 ? "s" : ""}` : ""), 3500);
+}
+
+function moveCurrentDoc() {
+  const path = state.currentDoc;
   if (!path) return;
-  try {
-    const r = await api("/api/note", { method: "POST", headers: H, body: JSON.stringify({ path }) });
-    if (state.editing && !confirmLeaveEditor()) return;
-    closeEditor();
-    await loadTree();
-    openEditor(r.path);
-  } catch (e) { toast(e.message); }
+  if (state.editing?.path === path) return toast("Close the editor before moving this note.");
+  const file = path.split("/").pop();
+  pickPlace({ title: `Move ${file}`, ok: "Move", folder: folderOf(path), file, action: ({ folder }) => {
+    if (folder === folderOf(path)) throw new Error("It's already in that folder.");
+    return moveFile(path, folder);
+  } });
+}
+
+/** Drag a file in the tree onto a folder (or a file in it) to move it there; onto empty space for the top level. */
+function bindTreeDrag() {
+  const tree = $("#tree"), MIME = "application/x-recall-path";
+  const clear = () => { $$(".drop-target", tree).forEach(n => n.classList.remove("drop-target")); tree.classList.remove("drop-root"); };
+  const dropFolder = e => {
+    const node = e.target.closest(".node");
+    if (!node) return "";
+    return node.dataset.path ? folderOf(node.dataset.path) : node.parentElement.dataset.dir;
+  };
+  tree.addEventListener("dragstart", e => {
+    const node = e.target.closest(".node[data-path]");
+    if (!node) return;
+    e.dataTransfer.setData(MIME, node.dataset.path);
+    e.dataTransfer.effectAllowed = "move";
+  });
+  tree.addEventListener("dragover", e => {
+    if (!e.dataTransfer.types.includes(MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const folder = dropFolder(e);
+    clear();
+    if (!folder) tree.classList.add("drop-root");
+    else $(`li[data-dir="${CSS.escape(folder)}"] > .node`, tree)?.classList.add("drop-target");
+  });
+  tree.addEventListener("dragleave", e => { if (!tree.contains(e.relatedTarget)) clear(); });
+  tree.addEventListener("dragend", clear);
+  tree.addEventListener("drop", e => {
+    const path = e.dataTransfer.getData(MIME);
+    if (!path) return;
+    e.preventDefault();
+    clear();
+    const folder = dropFolder(e);
+    if (folder !== folderOf(path)) moveFile(path, folder).catch(err => toast(err.message));
+  });
 }
 
 // ------------------------------------------------------------------ graph
@@ -705,6 +816,8 @@ function bind() {
   };
 
   $("#tree").addEventListener("click", e => {
+    const add = e.target.closest(".add");
+    if (add) return newNote(add.dataset.add);
     const node = e.target.closest(".node");
     if (!node) return;
     if (node.dataset.path) return openDoc(node.dataset.path);
@@ -714,6 +827,7 @@ function bind() {
     li.classList.contains("collapsed") ? set.add(li.dataset.dir) : set.delete(li.dataset.dir);
     localStorage.setItem("collapsed", JSON.stringify([...set]));
   });
+  bindTreeDrag();
   $("#tree-filter").oninput = renderTree;
   $("#tree-images").onchange = loadTree;
   $("#side-q").addEventListener("keydown", e => { if (e.key === "Enter") sideSearch(e.target.value.trim()); });
@@ -764,7 +878,8 @@ function bind() {
   };
 
   // editor
-  $("#new-note").onclick = newNote;
+  $("#new-note").onclick = () => newNote();
+  $("#doc-move").onclick = moveCurrentDoc;
   $("#doc-edit").onclick = () => state.currentDoc && openEditor(state.currentDoc);
   const ta = $("#ed-text");
   ta.addEventListener("input", () => { setEditorState(); schedulePreview(); });

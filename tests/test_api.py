@@ -58,13 +58,16 @@ def test_settings_validation_and_masking(client, notes):
     assert r["has_key"] and r["key_hint"] == "…9999" and "verysecret" not in json.dumps(r)
 
 
-def test_tree(ready):
+def test_tree(ready, notes):
     t = ready.get("/api/tree").json()
     names = [c["name"] for c in t["children"]]
     assert names[0] == "networking"  # folders first
     assert ".hidden" not in names and "images" not in names
     with_images = ready.get("/api/tree?images=true").json()
     assert "images" in [c["name"] for c in with_images["children"]]
+    (notes / "inbox" / "later").mkdir(parents=True)
+    inbox = next(c for c in ready.get("/api/tree").json()["children"] if c["name"] == "inbox")
+    assert inbox["children"] == [{"name": "later", "path": "inbox/later", "type": "dir", "children": []}]
 
 
 def test_doc_preview_markdown(ready):

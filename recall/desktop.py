@@ -12,6 +12,7 @@ import socket
 import sys
 import threading
 import time
+import traceback
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -53,10 +54,26 @@ def _free_port() -> int:
     raise RuntimeError("no free port")
 
 
+def _unblock_dlls() -> None:
+    """Remove the "downloaded from the internet" mark from the bundled DLLs.
+
+    Extracting a downloaded zip with Explorer marks every file (a Zone.Identifier stream), and .NET
+    Framework then refuses to load pythonnet's DLLs, which the native window needs.
+    """
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return
+    for dll in Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)).rglob("*.dll"):
+        try:
+            os.remove(f"{dll}:Zone.Identifier")
+        except OSError:
+            pass
+
+
 def _show(url: str) -> bool:
     """Open a native window; returns False if no web view is available."""
     if os.environ.get("RECALL_NO_WINDOW"):
         return False
+    _unblock_dlls()
     try:
         import webview
     except Exception:
@@ -65,8 +82,12 @@ def _show(url: str) -> bool:
         webview.settings["ALLOW_DOWNLOADS"] = True  # "Download .md" on answers
     except Exception:
         pass
-    webview.create_window("Recall", url, width=1400, height=900, min_size=(800, 560))
-    webview.start()
+    try:
+        webview.create_window("Recall", url, width=1400, height=900, min_size=(800, 560))
+        webview.start()
+    except Exception:
+        traceback.print_exc()  # goes to recall.log; fall back to the browser
+        return False
     return True
 
 
