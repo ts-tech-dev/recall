@@ -1,0 +1,22 @@
+services:
+  recall:
+    build:
+      context: .
+      network: host  # build-time DNS fails on this host otherwise (systemd-resolved)
+    image: tstech0806/recall:latest
+    container_name: recall
+    restart: unless-stopped
+    ports:
+      # Bind address on the host. Defaults to localhost only; see .env.example.
+      - "${RECALL_BIND:-127.0.0.1}:${RECALL_PORT:-8765}:8765"
+    environment:
+      # Host names/IPs you'll type in the browser (besides localhost), comma-separated.
+      RECALL_ALLOWED_HOSTS: ${RECALL_ALLOWED_HOSTS:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ${NOTES_DIR:-./notes}:/notes
+      - recall-data:/data
+
+volumes:
+  recall-data:

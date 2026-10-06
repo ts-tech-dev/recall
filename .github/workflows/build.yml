@@ -1,0 +1,115 @@
+name: Build
+
+# Every push to main: tests, Windows .exe (as a workflow artifact) and Docker image :latest.
+# A version tag (git tag v0.2.0 && git push --tags): also a GitHub Release with the zip, and Docker image :0.2.0.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  IMAGE: tstech0806/recall
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          # rapidocr pulls in the GUI OpenCV; keep only the headless build
+          pip uninstall -y opencv-python
+          pip install --force-reinstall --no-deps opencv-python-headless
+      - name: Test
+        run: python -m pytest -q
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build Recall.exe
+        run: powershell -ExecutionPolicy Bypass -File packaging\build-windows.ps1
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory smoke-notes | Out-Null
+          Set-Content smoke-notes\hello.md "# Hello`n`nThe UPS keeps the NAS alive during blackouts."
+          $env:RECALL_NO_WINDOW = "1"
+          $env:RECALL_NOTES_DIR = "$PWD\smoke-notes"
+          $env:RECALL_DATA_DIR = "$PWD\smoke-data"
+          $p = Start-Process dist\Recall\Recall.exe -PassThru
+          $ok = $false
+          foreach ($i in 1..90) {
+            Start-Sleep 2
+            try {
+              $s = Invoke-RestMethod http://127.0.0.1:8765/api/status
+              if ($s.index.docs -ge 1 -and -not $s.progress.running) { $ok = $true; break }
+            } catch {}
+          }
+          $r = if ($ok) { Invoke-RestMethod "http://127.0.0.1:8765/api/search?q=blackouts" } else { $null }
+          Stop-Process $p -Force
+          Get-Content smoke-data\recall.log -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "Recall.exe did not index the sample note" }
+          if ($r.results.Count -lt 1) { throw "search returned no results" }
+          Write-Host "Indexed $($s.index.docs) note(s); search OK; semantic=$($s.index.semantic)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Recall-windows
+          path: dist/Recall-windows.zip
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Recall-windows.zip
+          generate_release_notes: true
+    permissions:
+      contents: write
+
+  docker:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      # Skips the push until the secret exists: gh secret set DOCKERHUB_TOKEN
+      HAS_TOKEN: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: No Docker Hub token
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::warning::DOCKERHUB_TOKEN secret not set; skipping Docker Hub push"
+      - uses: docker/setup-buildx-action@v3
+        if: env.HAS_TOKEN == 'true'
+      - uses: docker/login-action@v3
+        if: env.HAS_TOKEN == 'true'
+        with:
+          username: tstech0806
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: meta
+        if: env.HAS_TOKEN == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=sha,format=short
+      - uses: docker/build-push-action@v6
+        if: env.HAS_TOKEN == 'true'
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

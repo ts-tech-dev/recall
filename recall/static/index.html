@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recall</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6fdf'/><path d='M9 8h9a5 5 0 0 1 0 10h-3l6 6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 8v16' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>">
+<link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn only-narrow" id="toggle-sidebar" title="Toggle file list" aria-label="Toggle file list">☰</button>
+  <div class="brand">Recall</div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="ask" class="tab active">Ask</button>
+    <button role="tab" data-view="browse" class="tab">Browse</button>
+    <button role="tab" data-view="graph" class="tab">Graph</button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="status" id="status" title="Index status"></div>
+  <button class="btn ghost" id="reindex" title="Scan the notes folder for new or changed files">Re-index</button>
+  <button class="icon-btn" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-search">
+      <input id="side-q" type="search" placeholder="Search… (Enter)" autocomplete="off">
+      <select id="side-mode" aria-label="Search mode" title="Search mode">
+        <option value="hybrid">Smart</option><option value="keyword">Exact</option><option value="semantic">Meaning</option>
+      </select>
+    </div>
+    <div class="side-filter">
+      <input id="tree-filter" type="search" placeholder="Filter files" autocomplete="off">
+      <label class="check small"><input type="checkbox" id="tree-images"> images</label>
+      <button class="btn ghost small" id="new-note" title="Create a new Markdown note">+ Note</button>
+    </div>
+    <div id="side-results" class="side-results" hidden></div>
+    <div id="tree" class="tree" role="tree"></div>
+  </aside>
+
+  <main class="main">
+    <!-- Ask -->
+    <section class="view" id="view-ask">
+      <div class="ask-wrap">
+        <form id="ask-form" class="ask-form">
+          <textarea id="question" rows="2" placeholder="Ask anything about your notes…  (Ctrl+Enter to ask)" required></textarea>
+          <div class="ask-controls">
+            <div class="segmented" role="radiogroup" aria-label="Answer type">
+              <label><input type="radio" name="mode" value="summary" checked><span>Summary</span></label>
+              <label><input type="radio" name="mode" value="report"><span>Detailed report</span></label>
+            </div>
+            <div class="filters">
+              <div class="chips" id="type-chips" aria-label="File types"></div>
+              <select id="folder-filter" aria-label="Folder"><option value="">All folders</option></select>
+              <span class="scope-chip" id="doc-scope" hidden></span>
+            </div>
+            <button class="btn primary" type="submit" id="ask-btn">Ask</button>
+          </div>
+        </form>
+
+        <div id="answer-area" hidden>
+          <div class="answer-head">
+            <div class="answer-q" id="answer-q"></div>
+            <div class="answer-actions">
+              <span class="muted small" id="answer-meta"></span>
+              <button class="btn ghost small" id="copy-answer">Copy</button>
+              <button class="btn ghost small" id="download-answer">Download .md</button>
+            </div>
+          </div>
+          <div class="answer-grid">
+            <article id="answer" class="md answer"></article>
+            <aside class="sources">
+              <h3>Sources</h3>
+              <ol id="sources"></ol>
+            </aside>
+          </div>
+        </div>
+
+        <div id="history-wrap" class="history">
+          <h3>Recent questions</h3>
+          <ul id="history"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Browse -->
+    <section class="view" id="view-browse" hidden>
+      <div id="doc-empty" class="empty">Pick a note from the list on the left to preview it.</div>
+      <div id="doc" hidden>
+        <div class="doc-head">
+          <div>
+            <h1 id="doc-title"></h1>
+            <div class="doc-path muted small" id="doc-path"></div>
+            <div class="tags" id="doc-tags"></div>
+          </div>
+          <div class="doc-actions">
+            <button class="btn ghost small" id="doc-pdf-toggle" hidden>Text view</button>
+            <button class="btn small" id="doc-edit" hidden>Edit</button>
+            <button class="btn ghost small" id="doc-ask">Ask about this note</button>
+            <a class="btn ghost small" id="doc-raw" target="_blank" rel="noopener">Open original</a>
+          </div>
+        </div>
+        <div class="doc-body">
+          <article id="doc-content" class="md"></article>
+          <aside class="doc-side">
+            <nav class="toc" id="toc" aria-label="Outline"></nav>
+            <div class="related" id="related"></div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- Editor -->
+      <div id="editor" hidden>
+        <div class="editor-bar">
+          <div class="editor-title"><strong id="ed-path"></strong> <span class="muted small" id="ed-state"></span></div>
+          <div class="editor-actions">
+            <select id="ed-versions" aria-label="Previous versions"><option value="">History…</option></select>
+            <label class="check small"><input type="checkbox" id="ed-preview-toggle" checked> Preview</label>
+            <button class="btn ghost small" id="ed-image" title="Insert an image (you can also paste or drop one)">Image…</button>
+            <input type="file" id="ed-file" accept="image/*" hidden multiple>
+            <button class="btn ghost small" id="ed-cancel">Close</button>
+            <button class="btn primary small" id="ed-save" title="Ctrl+S">Save</button>
+          </div>
+        </div>
+        <div class="editor-conflict" id="ed-conflict" hidden>
+          The file changed on disk since you opened it.
+          <button class="btn small" id="ed-overwrite">Overwrite with my version</button>
+          <button class="btn ghost small" id="ed-discard">Discard mine and reload</button>
+        </div>
+        <div class="editor-panes" id="ed-panes">
+          <textarea id="ed-text" spellcheck="true" aria-label="Note source"></textarea>
+          <article id="ed-preview" class="md"></article>
+        </div>
+      </div>
+    </section>
+    <!-- Graph -->
+    <section class="view graph-view" id="view-graph" hidden>
+      <div class="graph-bar">
+        <input id="graph-filter" type="search" placeholder="Highlight notes…" autocomplete="off">
+        <label class="check small"><input type="checkbox" id="graph-similar" checked> similarity links</label>
+        <label class="check small"><input type="checkbox" id="graph-orphans" checked> unconnected notes</label>
+        <label class="check small"><input type="checkbox" id="graph-local"> only around current note</label>
+        <span class="muted small" id="graph-info"></span>
+        <span class="legend"><i class="ln link"></i> link <i class="ln similar"></i> similar topic</span>
+      </div>
+      <svg id="graph" role="img" aria-label="Graph of notes and how they connect"></svg>
+    </section>
+  </main>
+</div>
+
+<!-- Settings -->
+<dialog id="settings">
+  <form method="dialog" id="settings-form">
+    <h2>Settings</h2>
+    <label>Notes folder
+      <input name="notes_dir" placeholder="/home/me/notes" autocomplete="off">
+      <span class="hint">Absolute path to the folder that holds your notes. Sub-folders are included.</span>
+    </label>
+    <fieldset>
+      <legend>AI answer generation</legend>
+      <label>Provider
+        <select name="provider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI-compatible (OpenAI, Ollama, LM Studio…)</option>
+          <option value="none">None — local passages only</option>
+        </select>
+      </label>
+      <label>API key
+        <input name="api_key" type="password" autocomplete="off" placeholder="">
+        <span class="hint" id="key-hint"></span>
+      </label>
+      <label class="check"><input type="checkbox" name="clear_api_key"> Remove saved key</label>
+      <label>Model <input name="model" autocomplete="off"></label>
+      <label data-for="openai">Base URL
+        <input name="base_url" placeholder="http://localhost:11434/v1 (blank = api.openai.com)" autocomplete="off">
+      </label>
+      <label data-for="anthropic">Effort
+        <select name="effort">
+          <option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option>
+        </select>
+        <span class="hint">Higher effort = more thorough answers, slower and costlier.</span>
+      </label>
+      <label class="check"><input type="checkbox" name="send_images"> Send note images to the AI so it can pick relevant ones</label>
+      <div class="row">
+        <label>Images sent <input name="max_images" type="number" min="1" max="20"></label>
+        <label>Passages retrieved <input name="top_k" type="number" min="1" max="50"></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Search &amp; indexing (runs locally)</legend>
+      <label class="check"><input type="checkbox" name="semantic_search"> Search by meaning (local embedding model, ~70&nbsp;MB download once)</label>
+      <label>Embedding model <input name="embed_model" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" name="ocr"> Read text in images and scanned PDFs (OCR)</label>
+      <label class="check"><input type="checkbox" name="watch"> Re-index automatically when files change</label>
+      <label class="check"><input type="checkbox" name="caption_images"> Describe images with AI so they're searchable (uses API calls)</label>
+      <div class="row">
+        <label>Caption model <input name="caption_model" placeholder="same as above" autocomplete="off"></label>
+        <label>Max captions per run <input name="caption_limit" type="number" min="0" max="5000"></label>
+      </div>
+      <span class="hint" id="feature-hint"></span>
+    </fieldset>
+    <p class="error" id="settings-error"></p>
+    <div class="dialog-actions">
+      <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+      <button class="btn primary" id="settings-save" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="lightbox" class="lightbox" hidden><img alt=""></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
+<script src="/static/vendor/highlight.min.js"></script>
+<script src="/static/vendor/d3.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
