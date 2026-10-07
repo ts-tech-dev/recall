@@ -118,6 +118,7 @@
             <div class="tags" id="doc-tags"></div>
           </div>
           <div class="doc-actions">
+            <button class="btn ghost small" id="doc-outline" title="Show the note's headings beside it" aria-pressed="false" hidden>Outline</button>
             <button class="btn ghost small" id="doc-pdf-toggle" hidden>Text view</button>
             <button class="btn small" id="doc-edit" hidden>Edit</button>
             <button class="btn ghost small" id="doc-move" title="Move to another folder (or drag it in the file list)">Move…</button>
@@ -128,11 +129,10 @@
         <div class="doc-body">
           <div class="doc-main">
             <article id="doc-content" class="md"></article>
-            <p class="doc-similar muted small" id="doc-similar" hidden></p>
+            <div class="doc-footer muted small" id="doc-footer" hidden></div>
           </div>
           <aside class="doc-side">
             <nav class="toc" id="toc" aria-label="Outline"></nav>
-            <div class="related" id="related"></div>
           </aside>
         </div>
       </div>

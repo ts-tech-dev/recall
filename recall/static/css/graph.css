@@ -18,9 +18,9 @@
 
 @media (max-width: 1100px) {
   .doc-side { position: static; max-height: none; }
-  .answer-grid, .doc-body { grid-template-columns: minmax(0, 1fr); }
+  .answer-grid, .doc-body, .doc-body.with-outline { grid-template-columns: minmax(0, 1fr); }
   .sources, .toc { position: static; }
-  .toc { display: none; }
+  .toc, #doc-outline { display: none; }
   .editor-panes { grid-template-columns: 1fr; }
   .editor-panes #ed-preview { display: none; }
 }

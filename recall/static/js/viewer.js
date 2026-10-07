@@ -1,4 +1,4 @@
-// Browse view: note preview, outline, related notes and #doc= routing.
+// Browse view: note preview, outline, related notes (footer) and #doc= routing.
 
 import { $, $$, H, api, esc, toast } from "./util.js";
 import { state } from "./state.js";
@@ -36,7 +36,7 @@ export async function openDoc(path, anchor = "", { pushHash = true, force = fals
     // PDFs open in the browser's viewer; their extracted text is only fetched for "Text view".
     const textless = /\.pdf$/i.test(path) ? "&text=false" : "";
     try { d = await api("/api/doc?path=" + encodeURIComponent(path) + textless); }
-    catch (e) { $("#doc-content").innerHTML = `<p class="error">${esc(e.message)}</p>`; $("#toc").innerHTML = ""; return; }
+    catch (e) { $("#doc-content").innerHTML = `<p class="error">${esc(e.message)}</p>`; $("#toc").innerHTML = ""; updateOutline(); return; }
     if (state.currentDoc !== path) return;  // user clicked elsewhere meanwhile
     renderDoc(d);
   }
@@ -61,7 +61,7 @@ export function renderDoc(d) {
     c.innerHTML = `<pre class="plain"></pre>`;
     $("pre", c).textContent = d.markdown;
   } else if (d.kind === "pdf") {
-    const showPdf = () => { c.className = "md full"; c.innerHTML = `<iframe src="${esc(d.raw_url)}" title="${esc(d.title)}"></iframe>`; toggle.textContent = "Text view"; };
+    const showPdf = () => { c.className = "md full"; c.innerHTML = `<iframe src="${esc(d.raw_url)}" title="${esc(d.title)}"></iframe>`; toggle.textContent = "Text view"; buildToc(); };
     const showText = async () => {
       if (d.markdown == null) {
         c.className = "md"; c.innerHTML = `<p class="muted">Reading the PDF's text…</p>`;
@@ -101,6 +101,16 @@ export function buildToc() {
     ? `<div class="muted small" style="margin-bottom:6px">On this page</div>` +
       hs.map(h => `<a href="#" data-anchor="${esc(h.id)}" class="l${h.tagName[1]}">${esc(h.textContent)}</a>`).join("")
     : "";
+  updateOutline();
+}
+
+// The outline sits beside the note only when switched on (remembered per browser), so the note gets the full width.
+function outlineWanted() { try { return localStorage.getItem("outline") === "1"; } catch { return false; } }
+export function updateOutline() {
+  const has = !!$("#toc").innerHTML, on = has && outlineWanted(), btn = $("#doc-outline");
+  btn.hidden = !has;
+  btn.setAttribute("aria-pressed", on);
+  $(".doc-body").classList.toggle("with-outline", on);
 }
 
 export function scrollToAnchor(anchor, tries = 0) {
@@ -118,19 +128,19 @@ export function scrollToAnchor(anchor, tries = 0) {
 }
 
 export async function loadRelated(path) {
-  const box = $("#related"), similar = $("#doc-similar");
-  box.innerHTML = ""; similar.hidden = true;
+  // Linked from / Links to / Similar notes: small lines under the note.
+  const foot = $("#doc-footer");
+  foot.innerHTML = ""; foot.hidden = true;
   let r;
   try { r = await api("/api/related?path=" + encodeURIComponent(path)); } catch { return; }
   if (state.currentDoc !== path) return;
-  const list = (title, items, extra = () => "") => items.length
-    ? `<h4>${title}</h4><ul>${items.map(i => `<li><a href="#" data-path="${esc(i.path)}" title="${esc(i.path)}">${esc(i.title)}${extra(i)}</a></li>`).join("")}</ul>`
+  const line = (label, items, extra = () => "") => items.length
+    ? `<div><span class="lbl">${label}:</span> ${items.map(i =>
+        `<a href="#" data-path="${esc(i.path)}" title="${esc(i.path)}">${esc(i.title)}</a>${extra(i)}`).join(" · ")}</div>`
     : "";
-  box.innerHTML = list("Linked from", r.backlinks) + list("Links to", r.outgoing);
-  // Similar notes: a small line under the note.
-  similar.innerHTML = r.similar.length ? "Similar notes: " + r.similar.map(i =>
-    `<a href="#" data-path="${esc(i.path)}" title="${esc(i.path)}">${esc(i.title)}</a> <span class="pct">${Math.round(i.similarity * 100)}%</span>`).join(" · ") : "";
-  similar.hidden = !r.similar.length;
+  foot.innerHTML = line("Linked from", r.backlinks) + line("Links to", r.outgoing) +
+    line("Similar notes", r.similar, i => ` <span class="pct">${Math.round(i.similarity * 100)}%</span>`);
+  foot.hidden = !foot.innerHTML;
 }
 
 export function route() {
@@ -155,10 +165,14 @@ export function bindViewer() {
     const tag = e.target.closest("a.tag");
     if (tag) { e.preventDefault(); $("#side-q").value = "#" + tag.dataset.tag; sideSearch(tag.dataset.tag); $("#sidebar").classList.add("open"); }
   });
-  for (const id of ["#related", "#doc-similar"]) $(id).addEventListener("click", e => {
+  $("#doc-footer").addEventListener("click", e => {
     const a = e.target.closest("a[data-path]");
     if (a) { e.preventDefault(); openDoc(a.dataset.path); }
   });
+  $("#doc-outline").onclick = () => {
+    try { localStorage.setItem("outline", outlineWanted() ? "0" : "1"); } catch {}
+    updateOutline();
+  };
   // Images open in a lightbox; links to other notes (#doc=…) open in the previewer.
   document.addEventListener("click", e => {
     const img = e.target.closest(".md img:not(.solo), .thumbs img");
