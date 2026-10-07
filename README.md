@@ -85,8 +85,8 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 - **Graph**: every note is a node. Solid lines are links (`[[wikilinks]]`, relative Markdown links) and dashed
   lines are similar-topic connections from the embeddings. You can highlight, focus on the current note,
   hide unconnected notes and click to open. Each note also shows *Linked from*, *Links to* and *Similar notes*.
-- **Editing**: edit Markdown and text notes with a live preview. Paste, drop or pick images and they are saved next
-  to the note and linked automatically. Ctrl+S saves. If the file changed on disk since you opened it, you're
+- **Editing**: edit Markdown and text notes with a live preview. Paste, drop or pick images and they are saved in an
+  `images` folder next to the note (created if it doesn't exist yet) and linked as `images/<name>`. Ctrl+S saves. If the file changed on disk since you opened it, you're
   asked before anything is overwritten. The last 30 versions of each note are kept (*History…*). *+ Note*
   creates a new note: pick the folder from a list, or make a new one. The **+** next to a folder in the file
   list creates the note in that folder.

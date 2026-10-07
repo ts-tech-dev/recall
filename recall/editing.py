@@ -18,6 +18,7 @@ MARKDOWN_EXTS = {".md", ".markdown"}
 UPLOAD_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 MAX_NOTE_BYTES = 5_000_000
 MAX_UPLOAD_BYTES = 25_000_000
+IMAGES_DIR = "images"  # uploads go to this folder next to the note
 KEEP_VERSIONS = 30
 
 
@@ -259,14 +260,16 @@ def _safe_name(name: str) -> str:
 
 
 def save_upload(root: Path, note_rel: str, filename: str, data: bytes) -> dict:
-    """Store an image next to the note (same folder) and return the relative link to insert."""
+    """Store an image in the `images` folder next to the note (created if needed); return the link to insert."""
     note = inside(root, note_rel)
     name = _safe_name(filename or "pasted.png")
     if Path(name).suffix not in UPLOAD_EXTS:
         raise EditError("Only image files can be uploaded", 415)
     if len(data) > MAX_UPLOAD_BYTES:
         raise EditError("Image is too large", 413)
-    folder = note.parent
+    folder = note.parent / IMAGES_DIR
+    if folder.exists() and not folder.is_dir():
+        raise EditError(f"'{IMAGES_DIR}' next to this note is a file, not a folder", 409)
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / name
     n = 1
@@ -277,4 +280,5 @@ def save_upload(root: Path, note_rel: str, filename: str, data: bytes) -> dict:
         n += 1
     else:
         _atomic_write(target, data)
-    return {"name": target.name, "path": target.relative_to(root.resolve()).as_posix()}
+    return {"name": target.name, "path": target.relative_to(root.resolve()).as_posix(),
+            "link": f"{IMAGES_DIR}/{target.name}"}

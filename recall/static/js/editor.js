@@ -130,7 +130,7 @@ export async function uploadImages(files) {
       const body = await r.json();
       if (!r.ok) throw new Error(body.detail || r.statusText);
       const alt = body.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
-      insertAtCursor(ta, `![${alt}](${encodeURI(body.name)})\n`);
+      insertAtCursor(ta, `![${alt}](${encodeURI(body.link)})\n`);
     } catch (e) { toast("Upload failed: " + e.message); }
   }
 }

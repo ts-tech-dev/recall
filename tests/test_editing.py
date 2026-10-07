@@ -67,15 +67,27 @@ def test_create_note(notes):
         editing.create_note(notes, "evil.html")
 
 
-def test_upload_next_to_note(notes):
+def test_upload_into_images_folder_next_to_note(notes):
     png = make_png()
+    assert not (notes / "networking" / "images").exists()
     r = editing.save_upload(notes, "networking/vlans.md", "My Screen Shot.png", png)
-    assert r == {"name": "My-Screen-Shot.png", "path": "networking/My-Screen-Shot.png"}
+    assert r == {"name": "My-Screen-Shot.png", "path": "networking/images/My-Screen-Shot.png",
+                 "link": "images/My-Screen-Shot.png"}
+    assert (notes / "networking/images/My-Screen-Shot.png").read_bytes() == png
     assert editing.save_upload(notes, "networking/vlans.md", "My Screen Shot.png", png)["name"] == "My-Screen-Shot.png"
     other = editing.save_upload(notes, "networking/vlans.md", "My Screen Shot.png", make_png(rgb=(1, 2, 3)))
     assert other["name"] == "My-Screen-Shot-1.png"
     with pytest.raises(EditError):
         editing.save_upload(notes, "networking/vlans.md", "script.js", b"alert(1)")
+    # a top-level note uses the existing top-level images folder
+    assert editing.save_upload(notes, "backups.md", "b.png", png)["path"] == "images/b.png"
+
+
+def test_upload_refuses_images_file(notes):
+    (notes / "ideas").mkdir()
+    (notes / "ideas" / "images").write_text("not a folder")
+    with pytest.raises(EditError):
+        editing.save_upload(notes, "ideas/today.md", "a.png", make_png())
 
 
 def test_list_folders_includes_empty(notes):
@@ -166,9 +178,10 @@ def test_api_new_note_render_and_upload(api, notes):
     assert r.json()["path"] == "ideas/today.md"
     up = api.post("/api/upload", data={"note": "ideas/today.md"}, files={"file": ("shot.png", make_png(), "image/png")},
                   headers=H)
-    assert up.json()["name"] == "shot.png" and (notes / "ideas/shot.png").exists()
-    md = api.post("/api/render", json={"path": "ideas/today.md", "markdown": "![s](shot.png) [[backups]]"}, headers=H)
-    assert md.json()["markdown"] == "![s](/api/file?path=ideas/shot.png) [backups](#doc=backups.md)"
+    assert up.json()["link"] == "images/shot.png" and (notes / "ideas/images/shot.png").exists()
+    md = api.post("/api/render", json={"path": "ideas/today.md", "markdown": "![s](images/shot.png) [[backups]]"},
+                  headers=H)
+    assert md.json()["markdown"] == "![s](/api/file?path=ideas/images/shot.png) [backups](#doc=backups.md)"
     bad = api.post("/api/upload", data={"note": "../x.md"}, files={"file": ("a.png", make_png(), "image/png")}, headers=H)
     assert bad.status_code == 400
 
