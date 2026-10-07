@@ -1,4 +1,4 @@
-// Ask view: questions, streamed answers, sources and history.
+// Ask view: questions, the matching passages, sources and history.
 
 import { $, H, esc, snippetHtml, toast } from "./util.js";
 import { TYPE_LABELS, state } from "./state.js";
@@ -18,6 +18,8 @@ export function setScope(path) {
   el.innerHTML = path ? `Only: ${esc(path.split("/").pop())} <button type="button" title="Search all notes" aria-label="Clear">✕</button>` : "";
 }
 
+const modeLabel = mode => mode === "report" ? "Full passages" : "Key passages";
+
 export async function ask(question, mode) {
   if (state.asking) state.asking.abort();
   const ctrl = new AbortController();
@@ -26,7 +28,7 @@ export async function ask(question, mode) {
   const out = $("#answer");
   $("#answer-area").hidden = false;
   $("#answer-q").textContent = question;
-  $("#answer-meta").textContent = mode === "report" ? "Detailed report" : "Summary";
+  $("#answer-meta").textContent = modeLabel(mode);
   $("#sources").innerHTML = "";
   out.innerHTML = `<p class="muted">Searching your notes…</p>`;
   out.classList.add("loading");
@@ -53,10 +55,9 @@ export async function ask(question, mode) {
       while ((i = buf.indexOf("\n\n")) >= 0) {
         const block = buf.slice(0, i); buf = buf.slice(i + 2);
         const ev = /^event: (.*)$/m.exec(block)?.[1], data = JSON.parse(/^data: (.*)$/m.exec(block)?.[1] ?? "null");
-        if (ev === "sources") { state.sources = data; renderSources(); out.innerHTML = `<p class="muted">${data.length ? "Writing answer…" : ""}</p>`; }
+        if (ev === "sources") { state.sources = data; renderSources(); out.innerHTML = `<p class="muted">${data.length ? "Loading passages…" : ""}</p>`; }
         else if (ev === "delta") { state.answerMd += data; schedule(); }
         else if (ev === "error") { failed = true; state.answerMd += `\n\n**Error:** ${data.message}`; paint(); }
-        else if (ev === "done") { $("#answer-meta").textContent += data.ai ? ` · ${data.model}` : " · local"; }
       }
     }
   } catch (e) {
@@ -93,7 +94,7 @@ export function renderHistory() {
   const h = loadHistory();
   $("#history-wrap").hidden = !h.length;
   $("#history").innerHTML = h.map((x, i) => `<li><a data-i="${i}">${esc(x.question)}</a>
-    <span class="muted small">${x.mode === "report" ? "report" : "summary"} · ${new Date(x.at).toLocaleDateString()}</span></li>`).join("");
+    <span class="muted small">${modeLabel(x.mode).toLowerCase()} · ${new Date(x.at).toLocaleDateString()}</span></li>`).join("");
 }
 export function showHistory(i) {
   const x = loadHistory()[i];
@@ -101,7 +102,7 @@ export function showHistory(i) {
   state.sources = x.sources; state.answerMd = x.md;
   $("#answer-area").hidden = false;
   $("#answer-q").textContent = x.question;
-  $("#answer-meta").textContent = (x.mode === "report" ? "Detailed report" : "Summary") + " · saved";
+  $("#answer-meta").textContent = modeLabel(x.mode) + " · saved";
   renderSources();
   renderMarkdown($("#answer"), x.md, { answer: true });
   $("#question").value = x.question;

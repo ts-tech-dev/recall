@@ -12,8 +12,6 @@ services:
     environment:
       # Host names/IPs you'll type in the browser (besides localhost), comma-separated.
       RECALL_ALLOWED_HOSTS: ${RECALL_ALLOWED_HOSTS:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - ${NOTES_DIR:-./notes}:/notes
       - recall-data:/data

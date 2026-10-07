@@ -1,19 +1,18 @@
 # Recall — a local knowledge base for your notes
 
 Point Recall at a folder of notes (Markdown with images, PDF, Word, PowerPoint, Excel/CSV, HTML, text),
-then ask questions and get a **summary** or a **detailed report** with citations and relevant images.
-It also lets you browse and preview every note.
+then ask questions and get the most relevant passages, with their sources and images.
+It also lets you browse, preview and edit every note.
 
-Everything is parsed, indexed and searched **on your machine**. An AI provider is only called to write
-the final answer, using just the passages retrieved for that question. With no AI configured, you get
-the most relevant passages instead.
+Everything is parsed, indexed and searched **on your machine**. Recall makes no calls to AI services
+(no Anthropic, OpenAI or other language models). Search by meaning and re-ranking use small local models
+that run on your CPU.
 
 ## Quick start
 
 ```bash
 cd /srv/projects/recall
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...        # optional: or paste the key in Settings
 .venv/bin/python -m recall --notes ~/notes # then open http://localhost:9999
 ```
 
@@ -22,7 +21,7 @@ If OpenCV fails to import with a `libGL.so.1` error (headless servers), run
 
 Options: `--port 9999` (or `RECALL_PORT`), `--host 127.0.0.1`. You can also set or change the notes folder later in **Settings**.
 App data (settings, index, extracted images) lives in `~/.recall` (override with `RECALL_DATA_DIR`).
-The settings file holds your API key and is written with `0600` permissions.
+The settings file is written with `0600` permissions.
 
 ## Docker
 
@@ -52,10 +51,11 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 
 ## Features
 
-- **Ask**: choose *Summary* or *Detailed report*. Filter by file type (Markdown, PDF, Word…), by folder,
-  or limit the question to one note with *Ask about this note*. The answer streams in, `[n]` citations
-  link to the source passages, and images from your notes are embedded where they help. Answers can be
-  copied or downloaded as `.md`. Recent questions are saved in the browser.
+- **Ask**: type a question and get the passages from your notes that answer it best, as *Key passages*
+  (short excerpts) or *Full passages* (longer ones, more of them). Filter by file type (Markdown, PDF, Word…),
+  by folder, or limit the question to one note with *Ask about this note*. Each `[n]` links to its source,
+  and images from those passages are shown. Results can be copied or downloaded as `.md`. Recent questions
+  are saved in the browser. *Passages retrieved for Ask* in Settings sets how many are fetched.
 - **Browse**: file tree with name filter, keyword search with highlighted snippets, and previews:
   rendered Markdown (relative images, Obsidian `![[embeds]]` and `[[wikilinks]]`), the browser's own PDF
   viewer (or a text view), converted Word/PowerPoint/Excel/CSV/HTML, and an outline for longer notes.
@@ -68,15 +68,6 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to
   the file straight away (with version history, and only if the file hasn't changed on disk since it was shown).
   In the editor's preview, ticking a box changes the text, which you then save.
-- **AI providers**:
-  - Anthropic: default model `claude-opus-5-5`, adjustable effort, and server-side refusal fallback.
-  - OpenAI-compatible: OpenAI, or local models through Ollama or LM Studio (set a Base URL such as `http://localhost:11434/v1`).
-  - None: shows the retrieved passages, no AI call.
-  - **Use AI features** in Settings switches all AI off or on at once (written answers and image descriptions).
-    When it's off, nothing is sent to an AI provider and Ask shows the most relevant passages; the provider, model
-    and key are kept for when you switch it back on.
-
-  With *Send note images to the AI* on, the top images are attached so the model can judge which ones are relevant.
 - **Smart search (by meaning)**: a local embedding model (`BAAI/bge-base-en-v1.5`, about 210 MB, downloaded
   once, CPU only) finds passages that mean the same thing even without shared words. For example, "power outage
   protection" finds a note about a UPS battery. Results are merged with keyword ranking, then a local re-ranking
@@ -87,9 +78,8 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
   font), so section titles help search and results say "4.2 Installing the agent" instead of "Page 37". Each
   result still opens the PDF at its page. Running headers and footers are dropped, and ruled tables become tables.
 - **Text in images**: OCR (local RapidOCR) reads screenshots, diagrams and scanned PDF pages. That text becomes
-  searchable and is passed to the AI with the passage the image belongs to. Images that sit loose in the folder
-  become searchable on their own. Optional **AI captions** describe each image once and are cached by image content.
-  They're off by default because they cost API calls. You can choose a cheaper caption model and a per-run limit.
+  searchable as part of the passage the image belongs to. Images that sit loose in the folder become searchable
+  on their own.
 - **Live folder watching**: adding, editing, renaming or deleting files outside the app triggers an incremental
   re-index within about 2 seconds. The open note and the file tree refresh on their own.
 - **Graph**: every note is a node. Solid lines are links (`[[wikilinks]]`, relative Markdown links) and dashed
@@ -115,12 +105,12 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 ```
 file ─► extractors/ ─► Markdown (+ images saved to cache) ─► chunker.py ─► heading-scoped chunks
                                                                             │ (each remembers its images)
-question ─► index/ (SQLite FTS5, BM25, filters) ─► top chunks + image catalogue ─► answer.py ─► llm.py
+question ─► index/ (SQLite FTS5 + local embeddings, filters) ─► top chunks ─► answer.py ─► passages + images
 ```
 
 Every format is normalized to Markdown, so one chunker and one previewer cover every type.
-Each chunk carries the images that appear in it. The AI gets an *image catalogue* of those URLs and
-may embed only those. The browser also removes any answer image that isn't served by Recall.
+Each chunk carries the images that appear in it, so a passage is shown with its images. The browser
+removes any image in an Ask result that isn't served by Recall.
 
 ## Project layout
 
@@ -137,7 +127,7 @@ Each piece lives in its own file, so it can be changed without touching the rest
 | `recall/index/` | The index: `core` (database, files), `build` (indexing), `search`, `graph`, `query` (filters), `schema` |
 | `recall/chunker.py` | Splits Markdown into heading-scoped chunks |
 | `recall/editing.py` | Saving, versions, new notes, moving files, uploads |
-| `recall/answer.py`, `recall/llm.py` | Retrieval for questions, and the AI providers |
+| `recall/answer.py` | Ask: retrieves and formats the best passages for a question |
 | `recall/embeddings.py`, `recall/rerank.py` | Local models for search by meaning and re-ranking |
 | `recall/images.py`, `recall/watcher.py` | OCR, folder watching |
 | `recall/static/index.html` | The page layout |
@@ -151,8 +141,8 @@ Each piece lives in its own file, so it can be changed without touching the rest
 - The server binds to `127.0.0.1`. Requests with a foreign `Host` header are refused (DNS-rebinding
   protection). Write requests need an `X-Recall` header, so other websites can't drive the API.
 - Files are served only from inside the notes folder (path traversal is blocked), with a sandboxing CSP.
-- Note content and AI output are sanitized with DOMPurify before rendering.
-- The browser never receives the API key. It only sees a masked hint.
+- Note content is sanitized with DOMPurify before rendering.
+- Nothing is sent to an AI service. The only downloads are the local search models, once.
 
 ## Tests
 
@@ -167,12 +157,12 @@ The fixtures generate a sample notes folder covering every file type, with image
 | `test_extractors.py` | Each file type, Obsidian syntax, traversal safety, PDF sections, tables and running headers |
 | `test_chunker.py` | Sections, code fences, images per chunk, splitting long text and tables |
 | `test_index.py` | Incremental and full builds, search for each type, every filter and combinations, FTS-injection safety |
-| `test_answer.py` | Retrieval, prompt, image catalogue, vision blocks, local answers, fake providers, and the real Anthropic SDK against a mocked HTTP transport |
-| `test_config.py` | Key masking and file permissions, validation |
+| `test_answer.py` | Retrieval, passage formatting, images, filters, result limits |
+| `test_config.py` | File permissions, validation, old AI settings dropped |
 | `test_api.py` | Every endpoint, previews for each type, SSE streaming, security guards |
 | `test_semantic.py` | Real embedding model: meaning-only matches, hybrid fusion, filters, no re-embedding, model change, failure fallback |
 | `test_rerank.py` | Re-ranking order, *Exact* mode untouched, fallback when the model fails, Settings switch |
-| `test_images.py` | OCR (images, scanned PDFs, cache), loose versus embedded images, captions (folding, limit, failure, refusal) |
+| `test_images.py` | OCR (images, scanned PDFs, cache), loose versus embedded images, text folded into passages |
 | `test_watcher.py` | Create, modify and delete picked up live; bursts debounced; hidden files ignored |
 | `test_graph.py` | Links and backlinks, updates after edits, dangling links, graph nodes and edges, similarity edges |
 | `test_editing.py` | Save, conflict and force, versions, unsafe paths, new notes, moves and link updates, folders, image uploads, timestamp precision, API flow |

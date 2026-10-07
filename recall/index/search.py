@@ -28,10 +28,9 @@ class SearchMixin:
             images = c.execute("SELECT COUNT(*) FROM docs WHERE kind='image'").fetchone()[0]
             chunks = c.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
             vectors = c.execute("SELECT COUNT(*) FROM vectors").fetchone()[0]
-            captions = c.execute("SELECT COUNT(*) FROM image_meta WHERE caption != ''").fetchone()[0]
             errors = [dict(r) for r in c.execute("SELECT path, error FROM docs WHERE error IS NOT NULL")]
             by_type = {r[0]: r[1] for r in c.execute("SELECT ext, COUNT(*) FROM docs WHERE kind='note' GROUP BY ext")}
-        return {"docs": docs, "images": images, "chunks": chunks, "vectors": vectors, "captions": captions,
+        return {"docs": docs, "images": images, "chunks": chunks, "vectors": vectors,
                 "errors": errors, "by_type": by_type, "version": self.version,
                 "semantic": bool(self.embedder) and not self.embed_error, "embed_error": self.embed_error,
                 "rerank": bool(self.reranker) and not self.rerank_error, "rerank_error": self.rerank_error}

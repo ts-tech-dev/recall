@@ -4,7 +4,7 @@
     files.py    file tree, folders, previews, raw files and cached images
     search.py   search, related notes, graph
     edit.py     reading/saving sources, new notes, moving, task checkboxes, uploads, versions
-    ask.py      AI answers (server-sent events)
+    ask.py      most relevant passages for a question (server-sent events)
 """
 
 from . import ask, edit, files, search, status

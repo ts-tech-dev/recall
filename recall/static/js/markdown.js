@@ -53,7 +53,7 @@ function markTasks(el) {
 
 /**
  * Render Markdown safely into `el`.
- * `answer`: an AI answer (only images served by this app, [n] citations become links).
+ * `answer`: an Ask result (only images served by this app, [n] citations become links).
  * `onTask(index, checked, count)`: make task checkboxes clickable; it saves and returns true, or false to undo.
  */
 export function renderMarkdown(el, md, { answer = false, onTask = null } = {}) {

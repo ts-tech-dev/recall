@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import threading
 from pathlib import Path
 
@@ -15,7 +14,6 @@ from .rerank import FastEmbedReranker
 from .rerank import available as rerank_available
 from .images import ocr_available
 from .index import Index
-from .llm import caption_image
 from .watcher import Watcher
 
 
@@ -46,12 +44,6 @@ class State:
             self._rerankers[s.rerank_model] = FastEmbedReranker(s.rerank_model)
         return self._rerankers[s.rerank_model]
 
-    def _captioner(self):
-        s = self.settings
-        if not (s.caption_images and s.ai_enabled()):
-            return None
-        return lambda data, media_type: caption_image(self.settings, base64.b64encode(data).decode(), media_type)
-
     @property
     def signature(self):
         """Changes whenever the settings that define the index (folder, models, OCR, watching) change."""
@@ -73,11 +65,9 @@ class State:
                 if s.watch and self.background:
                     self.watcher = Watcher(self.index)
                     self.watcher.start()
-            self.index.captioner = self._captioner()
             reranker = self._reranker()
             if reranker is not self.index.reranker:
                 self.index.reranker, self.index.rerank_error = reranker, ""
-            self.index.caption_limit = s.caption_limit
             return self.index
 
     def _close(self):

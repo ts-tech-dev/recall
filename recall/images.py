@@ -1,4 +1,4 @@
-"""Image text: OCR (local, RapidOCR) and optional AI captions, cached by image content hash."""
+"""Image text: OCR (local, RapidOCR), cached by image content hash."""
 
 from __future__ import annotations
 
@@ -70,14 +70,14 @@ def content_key(data: bytes) -> str:
 
 
 class ImageText:
-    """OCR + caption lookups backed by the index's `image_meta` table."""
+    """OCR lookups backed by the index's `image_meta` table."""
 
     def __init__(self, conn_factory, ocr_enabled: bool = True):
         self._conn = conn_factory
         self.ocr_enabled = ocr_enabled and ocr_available()
 
     def get(self, path: Path, conn=None, ocr: bool = True) -> dict:
-        """Return {"key", "ocr", "caption"} for an image file, running OCR if not cached.
+        """Return {"key", "ocr"} for an image file, running OCR if not cached.
 
         With ocr=False, an image not read yet is only recorded (ocr_done=0) for a later `read_pending`,
         so indexing a document with many figures doesn't wait for OCR.
@@ -86,16 +86,16 @@ class ImageText:
         try:
             data = path.read_bytes()
         except OSError:
-            return {"key": "", "ocr": "", "caption": ""}
+            return {"key": "", "ocr": ""}
         key = content_key(data)
         with self._use(conn) as c:
-            row = c.execute("SELECT ocr, caption, ocr_done FROM image_meta WHERE key=?", (key,)).fetchone()
+            row = c.execute("SELECT ocr, ocr_done FROM image_meta WHERE key=?", (key,)).fetchone()
         if row and (row["ocr_done"] or not self.ocr_enabled):
-            return {"key": key, "ocr": row["ocr"] or "", "caption": row["caption"] or ""}
+            return {"key": key, "ocr": row["ocr"] or ""}
         if not ocr:
             with self._use(conn) as c:
                 c.execute("INSERT INTO image_meta(key, ocr_done) VALUES(?, 0) ON CONFLICT(key) DO NOTHING", (key,))
-            return {"key": key, "ocr": "", "caption": row["caption"] if row else ""}
+            return {"key": key, "ocr": ""}
         text = ocr_bytes(data) if self.ocr_enabled else ""
         with self._use(conn) as c:
             c.execute(
@@ -103,7 +103,7 @@ class ImageText:
                 "ON CONFLICT(key) DO UPDATE SET ocr=excluded.ocr, ocr_done=excluded.ocr_done",
                 (key, text, 1 if self.ocr_enabled else 0),
             )
-        return {"key": key, "ocr": text, "caption": row["caption"] if row else ""}
+        return {"key": key, "ocr": text}
 
     @contextmanager
     def _use(self, conn):
@@ -117,11 +117,3 @@ class ImageText:
         with self._conn() as c:
             c.execute("INSERT INTO image_meta(key, ocr, ocr_done) VALUES(?,?,1) "
                       "ON CONFLICT(key) DO UPDATE SET ocr=excluded.ocr, ocr_done=1", (key, text))
-
-    def set_caption(self, key: str, caption: str, model: str) -> None:
-        with self._conn() as c:
-            c.execute(
-                "INSERT INTO image_meta(key, caption, caption_model) VALUES(?,?,?) "
-                "ON CONFLICT(key) DO UPDATE SET caption=excluded.caption, caption_model=excluded.caption_model",
-                (key, caption, model),
-            )

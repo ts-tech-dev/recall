@@ -116,3 +116,17 @@ def test_index_per_notes_dir(notes, data, tmp_path):
     other.mkdir()
     a, b = Index(notes, data), Index(other, data)
     assert a.db_path != b.db_path
+
+
+def test_old_ai_captions_are_dropped(index, notes, data):
+    """An index from a version with AI image captions forgets them and re-indexes the notes that used them."""
+    with index._conn() as c:
+        c.execute("ALTER TABLE image_meta ADD COLUMN caption TEXT")
+        c.execute("ALTER TABLE image_meta ADD COLUMN caption_model TEXT")
+        key = c.execute("SELECT key FROM doc_images di JOIN docs d ON d.id=di.doc_id "
+                        "WHERE d.path='networking/vlans.md'").fetchone()[0]
+        c.execute("UPDATE image_meta SET caption='a zebra', caption_model='ai' WHERE key=?", (key,))
+    again = Index(notes, data, ocr=False)
+    with again._conn() as c:
+        assert "caption" not in {r[1] for r in c.execute("PRAGMA table_info(image_meta)")}
+    assert again.build()["updated"] >= 1

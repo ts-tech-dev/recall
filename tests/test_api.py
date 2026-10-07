@@ -5,7 +5,6 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from recall import answer as answer_mod
 from recall.app import create_app
 
 H = {"X-Recall": "1"}
@@ -18,7 +17,7 @@ def client(data):
 
 @pytest.fixture()
 def ready(client, notes):
-    r = client.post("/api/settings", json={"notes_dir": str(notes), "provider": "none", "semantic_search": False, "rerank": False,
+    r = client.post("/api/settings", json={"notes_dir": str(notes), "semantic_search": False, "rerank": False,
                                            "ocr": False}, headers=H)
     assert r.status_code == 200
     r = client.post("/api/index?wait=true", headers=H)
@@ -68,10 +67,10 @@ def test_foreign_host_rejected(client):
     assert client.get("/api/status", headers={"Host": "evil.example.com"}).status_code == 403
 
 
-def test_settings_validation_and_masking(client, notes):
-    assert client.post("/api/settings", json={"provider": "x"}, headers=H).status_code == 400
-    r = client.post("/api/settings", json={"api_key": "sk-ant-verysecret-9999"}, headers=H).json()
-    assert r["has_key"] and r["key_hint"] == "…9999" and "verysecret" not in json.dumps(r)
+def test_settings_validation(client, notes):
+    assert client.post("/api/settings", json={"notes_dir": "/definitely/not/here"}, headers=H).status_code == 400
+    r = client.post("/api/settings", json={"top_k": 500, "api_key": "sk-ignored"}, headers=H).json()
+    assert r["top_k"] == 50 and "api_key" not in r
 
 
 def test_tree(ready, notes):
@@ -139,16 +138,14 @@ def test_ask_local_streams_sse(ready):
     assert r.headers["content-type"].startswith("text/event-stream")
     ev = sse(r.text)
     assert ev[0][0] == "sources" and ev[0][1][0]["path"] == "k8s-upgrade.pdf"
-    assert ev[-1] == ("done", {"ai": False})
+    assert ev[-1] == ("done", {})
 
 
-def test_ask_ai_with_filters(ready, monkeypatch):
-    ready.post("/api/settings", json={"provider": "anthropic", "api_key": "sk-test-0000"}, headers=H)
-    monkeypatch.setattr(answer_mod, "stream_answer", lambda *a, **k: iter(["A", "B"]))
+def test_ask_with_filters(ready):
     r = ready.post("/api/ask", json={"question": "VLAN", "mode": "report", "types": ["markdown"]}, headers=H)
     ev = sse(r.text)
-    assert all(s["ext"] == ".md" for s in ev[0][1])
-    assert "".join(d for e, d in ev if e == "delta") == "AB"
+    assert ev[0][1] and all(s["ext"] == ".md" for s in ev[0][1])
+    assert "### [1]" in "".join(d for e, d in ev if e == "delta")
     assert ev[-1][0] == "done"
 
 

@@ -1,4 +1,4 @@
-"""AI answers, streamed as server-sent events."""
+"""Ask: the most relevant passages for a question, streamed as server-sent events."""
 
 import json
 

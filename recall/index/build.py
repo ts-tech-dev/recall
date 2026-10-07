@@ -1,4 +1,4 @@
-"""Indexing: scanning the notes folder, extracting and chunking files, embeddings, OCR and AI captions."""
+"""Indexing: scanning the notes folder, extracting and chunking files, embeddings and OCR."""
 
 from __future__ import annotations
 
@@ -20,8 +20,6 @@ from .schema import REBUILT_TABLES
 log = logging.getLogger("recall.index")
 
 DOC_LINK_RE = re.compile(r"\]\(#doc=([^)\s]+)\)")
-CAPTION_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
-MAX_CAPTION_BYTES = 3_500_000
 MAX_IMAGE_TEXT = 1200
 
 
@@ -43,11 +41,6 @@ class BuildMixin:
             if stats["ocr"]:
                 again = self._build(False)
                 stats["updated"] += again["updated"]
-            if self.captioner and self.caption_limit > 0:
-                stats["captioned"] = self._caption_images()
-                if stats["captioned"]:
-                    again = self._build(False)  # fold the new captions into chunk text
-                    stats["updated"] += again["updated"]
             return stats
         finally:
             self.progress.update(running=False, phase="", current="", finished_at=time.time())
@@ -107,12 +100,10 @@ class BuildMixin:
         c.execute("DELETE FROM docs WHERE id=?", (doc_id,))
 
     def _image_text(self, info: dict, alt: str = "") -> str:
-        parts = []
-        if info["caption"]:
-            parts.append(f"shows: {info['caption']}")
-        if info["ocr"]:
-            parts.append("text in image: " + " ".join(info["ocr"].split())[:MAX_IMAGE_TEXT])
-        return f"[image{' ' + repr(alt) if alt else ''} {'; '.join(parts)}]" if parts else ""
+        if not info["ocr"]:
+            return ""
+        text = " ".join(info["ocr"].split())[:MAX_IMAGE_TEXT]
+        return f"[image{' ' + repr(alt) if alt else ''} text in image: {text}]"
 
     def _index_file(self, c, p: Path, rel: str, st, old_id, ctx: Context) -> str | None:
         keep = {}  # embeddings of passages that come out the same are reused, not recomputed
@@ -148,9 +139,8 @@ class BuildMixin:
         if is_image:
             info = self.images.get(p, c, ocr=False)
             c.execute("INSERT INTO doc_images VALUES(?,?,?)", (doc_id, info["key"], str(p)))
-            text = "\n".join(x for x in (info["caption"], info["ocr"]) if x)
-            if text:  # only images with recognizable content become searchable
-                rows.append((p.name, "", text, [{"url": file_url(rel), "alt": p.stem, "caption": info["caption"]}]))
+            if info["ocr"]:  # only images with recognizable text become searchable
+                rows.append((p.name, "", info["ocr"], [{"url": file_url(rel), "alt": p.stem}]))
         for ch in chunks:
             extra = []
             for img in ch.images:
@@ -159,8 +149,6 @@ class BuildMixin:
                     continue
                 info = self.images.get(local, c, ocr=False)
                 c.execute("INSERT INTO doc_images VALUES(?,?,?)", (doc_id, info["key"], str(local)))
-                if info["caption"]:
-                    img["caption"] = info["caption"]
                 t = self._image_text(info, img["alt"])
                 if t:
                     extra.append(t)
@@ -235,40 +223,4 @@ class BuildMixin:
         except Exception as e:  # e.g. the model can't be downloaded: keyword search still works
             self.embed_error = f"{type(e).__name__}: {e}"
             log.warning("Embedding failed: %s", self.embed_error)
-        return done
-
-    def _caption_images(self) -> int:
-        """Ask the AI to describe images that don't have a caption yet (up to caption_limit)."""
-        with self._conn() as c:
-            todo = c.execute(
-                "SELECT di.key, MIN(di.path) AS path FROM doc_images di LEFT JOIN image_meta m ON m.key=di.key "
-                "WHERE m.caption IS NULL AND m.caption_model IS NULL GROUP BY di.key LIMIT ?",
-                (self.caption_limit,),
-            ).fetchall()
-        if not todo:
-            return 0
-        self.progress.update(phase="captioning", done=0, total=len(todo), current="")
-        done = 0
-        for r in todo:
-            p = Path(r["path"])
-            self.progress["current"] = p.name
-            mt = CAPTION_TYPES.get(p.suffix.lower())
-            try:
-                data = p.read_bytes()
-            except OSError:
-                continue
-            if not mt or len(data) > MAX_CAPTION_BYTES:
-                self.images.set_caption(r["key"], "", "skipped")
-                continue
-            try:
-                caption = (self.captioner(data, mt) or "").strip()
-            except Exception as e:
-                log.warning("Captioning stopped: %s", e)
-                self.progress["error"] = str(e)
-                break  # bad key / rate limit: try again next run
-            self.images.set_caption(r["key"], caption, "ai")
-            done += 1
-            self.progress["done"] = done
-            with self._conn() as c:  # force the notes that show this image to be re-indexed
-                c.execute("UPDATE docs SET mtime=-1 WHERE id IN (SELECT doc_id FROM doc_images WHERE key=?)", (r["key"],))
         return done

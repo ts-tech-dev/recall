@@ -38,16 +38,14 @@ def get_settings(state: State = Depends(get_state)):
 def post_settings(update: dict, state: State = Depends(get_state)):
     with state.lock:
         before = state.signature
-        caption_before = (state.settings.caption_images, state.settings.caption_model)
         try:
             apply_update(state.settings, dict(update))
         except (ValueError, TypeError) as e:
             raise HTTPException(400, str(e))
         save_settings(state.settings)
         state.open_index()
-        # New folder, embedding model, OCR switch, or captions turned on: index (incrementally).
-        caption_now = (state.settings.caption_images, state.settings.caption_model)
-        if state.signature != before or (caption_now != caption_before and caption_now[0]):
+        # New folder, embedding model or OCR switch: index (incrementally).
+        if state.signature != before:
             state.reindex_async(wait_turn=True)
     return state.settings.public()
 

@@ -57,9 +57,9 @@
         <form id="ask-form" class="ask-form">
           <textarea id="question" rows="2" placeholder="Ask anything about your notes…  (Ctrl+Enter to ask)" required></textarea>
           <div class="ask-controls">
-            <div class="segmented" role="radiogroup" aria-label="Answer type">
-              <label><input type="radio" name="mode" value="summary" checked><span>Summary</span></label>
-              <label><input type="radio" name="mode" value="report"><span>Detailed report</span></label>
+            <div class="segmented" role="radiogroup" aria-label="Result length">
+              <label><input type="radio" name="mode" value="summary" checked><span>Key passages</span></label>
+              <label><input type="radio" name="mode" value="report"><span>Full passages</span></label>
             </div>
             <div class="filters">
               <div class="chips" id="type-chips" aria-label="File types"></div>
@@ -170,39 +170,6 @@
       <span class="hint">Absolute path to the folder that holds your notes. Sub-folders are included.</span>
     </label>
     <fieldset>
-      <legend>AI answer generation</legend>
-      <label class="check"><input type="checkbox" name="ai_features"> Use AI features (written answers, image descriptions)</label>
-      <span class="hint" id="ai-off-hint">Off: Ask shows the most relevant passages from your notes and nothing is sent to an AI
-        provider. Your provider, model and key are kept.</span>
-      <label>Provider
-        <select name="provider">
-          <option value="anthropic">Anthropic (Claude)</option>
-          <option value="openai">OpenAI-compatible (OpenAI, Ollama, LM Studio…)</option>
-          <option value="none">None — local passages only</option>
-        </select>
-      </label>
-      <label>API key
-        <input name="api_key" type="password" autocomplete="off" placeholder="">
-        <span class="hint" id="key-hint"></span>
-      </label>
-      <label class="check"><input type="checkbox" name="clear_api_key"> Remove saved key</label>
-      <label>Model <input name="model" autocomplete="off"></label>
-      <label data-for="openai">Base URL
-        <input name="base_url" placeholder="http://localhost:11434/v1 (blank = api.openai.com)" autocomplete="off">
-      </label>
-      <label data-for="anthropic">Effort
-        <select name="effort">
-          <option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option>
-        </select>
-        <span class="hint">Higher effort = more thorough answers, slower and costlier.</span>
-      </label>
-      <label class="check"><input type="checkbox" name="send_images"> Send note images to the AI so it can pick relevant ones</label>
-      <div class="row">
-        <label>Images sent <input name="max_images" type="number" min="1" max="20"></label>
-        <label>Passages retrieved <input name="top_k" type="number" min="1" max="50"></label>
-      </div>
-    </fieldset>
-    <fieldset>
       <legend>Search &amp; indexing (runs locally)</legend>
       <label class="check"><input type="checkbox" name="semantic_search"> Search by meaning (local embedding model, downloaded once)</label>
       <label>Embedding model <input name="embed_model" list="embed-models" autocomplete="off">
@@ -222,11 +189,7 @@
       </datalist>
       <label class="check"><input type="checkbox" name="ocr"> Read text in images and scanned PDFs (OCR)</label>
       <label class="check"><input type="checkbox" name="watch"> Re-index automatically when files change</label>
-      <label class="check" data-ai><input type="checkbox" name="caption_images"> Describe images with AI so they're searchable (uses API calls)</label>
-      <div class="row">
-        <label>Caption model <input name="caption_model" placeholder="same as above" autocomplete="off"></label>
-        <label>Max captions per run <input name="caption_limit" type="number" min="0" max="5000"></label>
-      </div>
+      <label>Passages retrieved for Ask <input name="top_k" type="number" min="1" max="50"></label>
       <span class="hint" id="feature-hint"></span>
     </fieldset>
     <p class="error" id="settings-error"></p>

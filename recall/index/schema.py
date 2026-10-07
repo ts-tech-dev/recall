@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS doc_images(doc_id INTEGER, key TEXT, path TEXT);
 CREATE INDEX IF NOT EXISTS doc_images_doc ON doc_images(doc_id);
 CREATE INDEX IF NOT EXISTS doc_images_key ON doc_images(key);
 CREATE TABLE IF NOT EXISTS image_meta(
-    key TEXT PRIMARY KEY, ocr TEXT, ocr_done INTEGER DEFAULT 0, caption TEXT, caption_model TEXT);
+    key TEXT PRIMARY KEY, ocr TEXT, ocr_done INTEGER DEFAULT 0);
 """
-# Tables rebuilt when the schema changes; image_meta (OCR/caption cache) survives.
+# Tables rebuilt when the schema changes; image_meta (OCR cache) survives.
 REBUILT_TABLES = ("docs", "chunks", "chunks_fts", "vectors", "links", "doc_images")

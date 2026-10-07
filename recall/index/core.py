@@ -7,7 +7,6 @@ import os
 import re
 import sqlite3
 import threading
-from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -42,9 +41,6 @@ class Index(BuildMixin, SearchMixin, GraphMixin):
         self.rerank_error = ""
         self.ocr = ocr
         self.images = ImageText(self._conn, ocr_enabled=ocr)
-        # Set by the app: fn(image_bytes, media_type) -> caption, and the per-run limit.
-        self.captioner: Callable[[bytes, str], str] | None = None
-        self.caption_limit = 100
         self.version = 0  # bumped whenever indexed content changes (the UI polls this)
         self.last_changed: list[str] = []
         self.progress = {"running": False, "phase": "", "done": 0, "total": 0, "current": "", "errors": 0,
@@ -77,6 +73,12 @@ class Index(BuildMixin, SearchMixin, GraphMixin):
                     c.execute(f"DROP TABLE IF EXISTS {t}")
             c.executescript(SCHEMA)
             c.execute("INSERT OR REPLACE INTO meta VALUES('schema', ?)", (SCHEMA_VERSION,))
+            # Older versions could store AI image captions: drop them and re-index the notes that used them.
+            if "caption" in {r[1] for r in c.execute("PRAGMA table_info(image_meta)")}:
+                c.execute("UPDATE docs SET mtime=-1 WHERE id IN (SELECT di.doc_id FROM doc_images di "
+                          "JOIN image_meta m ON m.key=di.key WHERE m.caption != '')")
+                c.execute("ALTER TABLE image_meta DROP COLUMN caption")
+                c.execute("ALTER TABLE image_meta DROP COLUMN caption_model")
             # Vectors from a different embedding model are not comparable: drop them.
             want = self.embedder.name if self.embedder else ""
             row = c.execute("SELECT value FROM meta WHERE key='embed_model'").fetchone()

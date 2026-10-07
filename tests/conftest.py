@@ -137,8 +137,6 @@ def data(tmp_path, monkeypatch) -> Path:
     monkeypatch.setenv("RECALL_DATA_DIR", str(d))
     # share downloaded models across test runs instead of re-downloading per temp dir
     monkeypatch.setenv("RECALL_MODEL_DIR", str(Path.home() / ".cache" / "recall-test-models"))
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("RECALL_NOTES_DIR", raising=False)
     return d
 
@@ -163,7 +161,7 @@ def make_text_png(text: str, w: int = 520, h: int = 140) -> bytes:
 
 
 def add_image_notes(root: Path) -> Path:
-    """Extras for OCR/caption tests: a note with a text screenshot, a loose screenshot, a scanned PDF."""
+    """Extras for OCR tests: a note with a text screenshot, a loose screenshot, a scanned PDF."""
     import pymupdf
 
     (root / "firewall").mkdir()

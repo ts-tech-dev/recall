@@ -1,11 +1,8 @@
-"""OCR of images and scanned PDFs, AI captions, and how image text reaches search and answers."""
+"""OCR of images and scanned PDFs, and how image text reaches search and Ask."""
 
 import pytest
 
 from recall import images as images_mod
-from recall import llm
-from recall.answer import build_prompt, image_catalogue, retrieve
-from recall.config import Settings
 from recall.extractors import Context, extract
 from recall.images import ocr_available, ocr_bytes
 from recall.index import Index
@@ -67,57 +64,6 @@ def test_ocr_cached_by_content(ocr_index, image_notes, monkeypatch):
     (image_notes / "firewall" / "edge.md").write_text("# Edge firewall\n\nChanged.\n\n![rules](rules.png)\n")
     assert ocr_index.build()["updated"] == 1
     assert calls == []  # the image itself didn't change
-
-
-# ------------------------------------------------------------------ captions
-
-
-def test_captions_fold_into_search_and_prompt(image_notes, data):
-    idx = Index(image_notes, data, ocr=False)
-    seen = []
-
-    def captioner(data_bytes, media_type):
-        seen.append(media_type)
-        return "A network diagram of the zebra datacenter"
-
-    idx.captioner = captioner
-    s = idx.build()
-    assert s["captioned"] == len(seen) > 0
-    assert all(m == "image/png" for m in seen)
-    r = idx.search("zebra datacenter", limit=30)
-    note_hit = next(x for x in r if x["path"] == "firewall/edge.md")
-    assert "[image 'rules' shows: A network diagram" in note_hit["text"]
-    assert "firewall/rules.png" not in [x["path"] for x in r]  # embedded image: found via its note
-    assert "whiteboard.png" in [x["path"] for x in r]  # loose image: found on its own
-    # a second build doesn't caption the same images again
-    assert idx.build().get("captioned") == 0
-    hits = retrieve(idx, "zebra datacenter", None, 5)
-    cat = image_catalogue(hits)
-    assert cat[0]["caption"].startswith("A network diagram")
-    assert 'description="A network diagram' in build_prompt("q", "summary", hits, cat)
-
-
-def test_caption_limit_and_failure(image_notes, data):
-    idx = Index(image_notes, data, ocr=False)
-    idx.captioner = lambda b, m: "x"
-    idx.caption_limit = 1
-    assert idx.build()["captioned"] == 1
-
-    idx2 = Index(image_notes, data, ocr=False)
-
-    def boom(b, m):
-        raise RuntimeError("rate limited")
-
-    idx2.captioner = boom
-    assert idx2.build()["captioned"] == 0  # stops cleanly, retries next run
-
-
-def test_caption_image_strips_refusal_note(monkeypatch):
-    monkeypatch.setattr(llm, "stream_answer", lambda *a, **k: iter(["\n\n> The model declined to answer this request."]))
-    assert llm.caption_image(Settings(api_key="k"), "AAA", "image/png") == ""
-    monkeypatch.setattr(llm, "stream_answer", lambda s, *a, **k: iter([f"A chart ({s.model}, {s.effort})"]))
-    out = llm.caption_image(Settings(api_key="k", caption_model="claude-haiku-4-5"), "AAA", "image/png")
-    assert out == "A chart (claude-haiku-4-5, low)"
 
 
 def test_ocr_runs_after_text_is_searchable(image_notes, data, monkeypatch):

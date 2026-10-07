@@ -7,8 +7,7 @@ import { openDoc } from "./viewer.js";
 import { checkEditorDisk } from "./editor.js";
 import { renderGraph } from "./graph.js";
 
-export const PHASES = { reading: "Indexing", ocr: "Reading text in images", embedding: "Building smart search",
-  captioning: "Describing images" };
+export const PHASES = { reading: "Indexing", ocr: "Reading text in images", embedding: "Building smart search" };
 
 export async function refreshStatus() {
   try {
@@ -20,13 +19,12 @@ export async function refreshStatus() {
     return;
   }
   const p = s.progress, ix = s.index;
-  const ai = s.settings.ai_enabled ? `AI: ${esc(s.settings.model)}` : "AI off";
   const errs = ix && ix.errors.length ? ` · <span class="err" title="${esc(ix.errors.map(e => e.path + ": " + e.error).join("\n"))}">${ix.errors.length} unreadable</span>` : "";
   const sem = (ix && ix.embed_error ? ` · <span class="err" title="${esc(ix.embed_error)}">smart search off</span>` : "") +
     (ix && ix.rerank_error ? ` · <span class="err" title="${esc(ix.rerank_error)}">re-ranking off</span>` : "");
   el.innerHTML = p && p.running
     ? `${PHASES[p.phase] || "Indexing"} ${p.done}/${p.total}…`
-    : `${ix ? ix.docs : 0} notes${ix && ix.images ? ` · ${ix.images} images` : ""} · ${ai}${sem}${errs}${s.watching ? ` · <span title="Watching the folder for changes">live</span>` : ""}`;
+    : `${ix ? ix.docs : 0} notes${ix && ix.images ? ` · ${ix.images} images` : ""}${sem}${errs}${s.watching ? ` · <span title="Watching the folder for changes">live</span>` : ""}`;
   el.title = s.notes_dir;
   if (ix && state.indexVersion !== null && ix.version !== state.indexVersion) onIndexChanged(s.changed || []);
   if (ix) state.indexVersion = ix.version;

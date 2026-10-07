@@ -5,8 +5,6 @@ pymupdf>=1.24
 python-docx>=1.1
 python-pptx>=1.0
 openpyxl>=3.1
-anthropic>=1.11
-openai>=1.40
 numpy>=1.26
 # local "search by meaning" (ONNX, CPU only; downloads a ~70 MB model on first use)
 fastembed>=0.4
