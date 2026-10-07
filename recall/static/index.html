@@ -43,6 +43,7 @@
     <option value="auto">Auto</option><option value="light">Light</option><option value="grey">Grey</option><option value="dark">Dark</option>
   </select>
   <button class="icon-btn" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
+  <button class="icon-btn" id="shutdown" title="Shut down Recall" aria-label="Shut down Recall" hidden><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg></button>
 </header>
 
 <div class="layout">
@@ -176,6 +177,9 @@
   </main>
 </div>
 
+<!-- Shown while the app restarts on a new port, or after it shut down -->
+<div class="app-overlay" id="app-overlay" hidden><div class="app-overlay-box" id="app-overlay-msg"></div></div>
+
 <!-- Settings -->
 <dialog id="settings">
   <form method="dialog" id="settings-form">
@@ -184,6 +188,13 @@
       <input name="notes_dir" placeholder="/home/me/notes" autocomplete="off">
       <span class="hint">Absolute path to the folder that holds your notes. Sub-folders are included.</span>
     </label>
+    <fieldset id="app-settings" hidden>
+      <legend>App</legend>
+      <label>Port <input name="port" type="number" min="1024" max="65535">
+        <span class="hint" id="port-hint"></span>
+      </label>
+      <button type="button" class="btn ghost small" id="settings-shutdown">Shut down Recall</button>
+    </fieldset>
     <fieldset>
       <legend>Search &amp; indexing (runs locally)</legend>
       <label class="check"><input type="checkbox" name="semantic_search"> Search by meaning (local embedding model, downloaded once)</label>

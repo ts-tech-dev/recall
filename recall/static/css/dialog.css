@@ -2,6 +2,9 @@
 
 /* dialog */
 dialog { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); padding: 22px 24px; width: min(560px, calc(100vw - 32px)); }
+.app-overlay { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.app-overlay-box { max-width: 460px; text-align: center; font-size: 16px; }
+.app-overlay-box .muted { font-size: 14px; margin-top: 8px; }
 dialog::backdrop { background: rgba(10, 14, 20, .45); }
 dialog h2 { margin: 0 0 12px; }
 dialog label { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 14px; }

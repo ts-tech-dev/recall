@@ -6,13 +6,16 @@ import { loadTree } from "./tree.js";
 import { openDoc } from "./viewer.js";
 import { checkEditorDisk } from "./editor.js";
 import { renderGraph } from "./graph.js";
+import { syncAppControls } from "./appctl.js";
 
 export const PHASES = { reading: "Indexing", ocr: "Reading text in images", embedding: "Building smart search" };
 
 export async function refreshStatus() {
+  if (state.shutDown) return;
   try {
     state.status = await api("/api/status");
   } catch (e) { $("#status").textContent = e.message; return; }
+  syncAppControls();
   const s = state.status, el = $("#status");
   if (!s.notes_dir) {
     el.innerHTML = `<span class="err">No notes folder — open Settings</span>`;

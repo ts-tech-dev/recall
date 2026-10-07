@@ -1,6 +1,6 @@
 """Status, settings and re-indexing."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import __version__
 from ..config import apply_update, save_settings
@@ -9,12 +9,13 @@ from ..images import ocr_available
 from ..rerank import available as rerank_available
 from ..index import TYPE_GROUPS, Index
 from ..state import State, get_index, get_state
+from .control import app_info
 
 router = APIRouter(prefix="/api")
 
 
 @router.get("/status")
-def status(state: State = Depends(get_state)):
+def status(request: Request, state: State = Depends(get_state)):
     idx = state.open_index()
     return {
         "version": __version__,
@@ -26,6 +27,7 @@ def status(state: State = Depends(get_state)):
         "watching": bool(state.watcher),
         "features": {"semantic": embeddings_available(), "ocr": ocr_available(), "rerank": rerank_available()},
         "type_groups": TYPE_GROUPS,
+        "app": app_info(request),  # port and controls, when running as the desktop app
     }
 
 

@@ -7,7 +7,7 @@ import os
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-INT_LIMITS = {"top_k": (1, 50)}
+INT_LIMITS = {"top_k": (1, 50), "port": (1024, 65535)}
 
 
 def model_dir() -> Path:
@@ -33,6 +33,7 @@ class Settings:
     rerank_model: str = "Xenova/ms-marco-MiniLM-L-6-v2"  # ~80 MB
     ocr: bool = True  # read text from images and scanned PDF pages
     watch: bool = True  # re-index automatically when files change
+    port: int = 9999  # where the Windows app serves (RECALL_PORT overrides; the command line uses --port)
 
     def public(self) -> dict:
         """Settings as sent to the browser."""

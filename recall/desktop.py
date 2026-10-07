@@ -1,7 +1,8 @@
 """Desktop launcher: runs the server on this machine and opens Recall in your web browser.
 
 Used as the entry point of the Windows app (see packaging/). While it runs, a tray icon offers
-"Open Recall" and "Quit". Without a system tray (or with RECALL_NO_WINDOW set) it just keeps serving.
+"Open Recall" and "Quit". Without a system tray (or with RECALL_NO_WINDOW set) it keeps serving until
+"Shut down" in the web UI. The port is a setting; changing it in the web UI restarts the server there.
 """
 
 from __future__ import annotations
@@ -42,15 +43,29 @@ def _running_recall(port: int) -> bool:
         return False
 
 
+def _probe(port: int) -> int | None:
+    """Bind `port` (0 = any) the way uvicorn will and return it, or None if another program holds it."""
+    with socket.socket() as s:
+        if sys.platform != "win32":
+            # Like uvicorn: a port Recall just let go of (TIME_WAIT) can be used again straight away.
+            # (On Windows this option would allow sharing a port that is in use, so it's left off there.)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((HOST, port))
+            return s.getsockname()[1]
+        except OSError:
+            return None
+
+
+def port_free(port: int) -> bool:
+    return _probe(port) is not None
+
+
 def _free_port(preferred: int) -> int:
-    for port in (preferred, 0):
-        with socket.socket() as s:
-            try:
-                s.bind((HOST, port))
-                return s.getsockname()[1]
-            except OSError:
-                continue
-    raise RuntimeError("no free port")
+    port = _probe(preferred) or _probe(0)
+    if port is None:
+        raise RuntimeError("no free port")
+    return port
 
 
 def _open_browser(url: str) -> None:
@@ -73,27 +88,96 @@ def _tray_image():
     return img
 
 
-def _run_tray(url: str, stop) -> bool:
-    """Show the tray icon until Quit; returns False if no tray is available here."""
+class Launcher:
+    """Runs the server and lets the web UI restart it on another port or shut the app down.
+
+    The same FastAPI app (and so the same open index and folder watcher) is served across restarts.
+    """
+
+    def __init__(self, app):
+        self.app = app
+        self.server = None
+        self.thread: threading.Thread | None = None
+        self.port = 0
+        self.icon = None  # the tray icon, while it runs
+        self.port_locked = bool(os.environ.get("RECALL_PORT"))  # the environment wins over the setting
+        self.done = threading.Event()  # set by shutdown()
+        self._lock = threading.Lock()
+
+    @property
+    def url(self) -> str:
+        return f"http://localhost:{self.port}/"
+
+    def serve(self, port: int) -> None:
+        """Start serving on `port`, then stop the previous server (so the app is never unreachable)."""
+        import uvicorn
+
+        server = uvicorn.Server(uvicorn.Config(self.app, host=HOST, port=port, log_level="warning"))
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+        deadline = time.monotonic() + 60
+        while not server.started:
+            if not thread.is_alive() or time.monotonic() > deadline:
+                server.should_exit = True
+                raise RuntimeError(f"Recall could not start on port {port}")
+            time.sleep(0.05)
+        old, old_thread = self.server, self.thread
+        self.server, self.thread, self.port = server, thread, port
+        if self.icon is not None:
+            self.icon.title = f"Recall — {self.url}"
+        if old is not None:
+            old.should_exit = True
+            old_thread.join(timeout=5)
+
+    def restart(self, port: int) -> None:
+        """Move to `port` shortly after the current request has been answered."""
+        def later():
+            time.sleep(0.3)
+            with self._lock:
+                try:
+                    self.serve(port)
+                except Exception:
+                    import traceback
+
+                    traceback.print_exc()  # stays on the old port; see recall.log
+
+        threading.Thread(target=later, daemon=True).start()
+
+    def shutdown(self) -> None:
+        def later():
+            time.sleep(0.3)
+            self.done.set()
+            if self.icon is not None:
+                self.icon.stop()
+
+        threading.Thread(target=later, daemon=True).start()
+
+    def stop(self) -> None:
+        if self.server is not None:
+            self.server.should_exit = True
+            self.thread.join(timeout=5)
+
+
+def _run_tray(launcher: Launcher) -> bool:
+    """Show the tray icon until Quit (or Shut down in the app); returns False if no tray is available here."""
     if os.environ.get("RECALL_NO_WINDOW"):
         return False
     try:
         import pystray
 
-        def quit_(icon, _item):
-            icon.stop()
-
-        icon = pystray.Icon("Recall", _tray_image(), f"Recall — {url}", menu=pystray.Menu(
-            pystray.MenuItem("Open Recall", lambda *_: webbrowser.open(url), default=True),
-            pystray.MenuItem("Quit", quit_),
+        icon = pystray.Icon("Recall", _tray_image(), f"Recall — {launcher.url}", menu=pystray.Menu(
+            pystray.MenuItem("Open Recall", lambda *_: webbrowser.open(launcher.url), default=True),
+            pystray.MenuItem("Quit", lambda icon, _item: icon.stop()),
         ))
+        launcher.icon = icon
         icon.run()
     except Exception:
         import traceback
 
         traceback.print_exc()  # goes to recall.log; keep serving without a tray
+        launcher.icon = None
         return False
-    stop()
+    launcher.icon = None
     return True
 
 
@@ -101,37 +185,32 @@ def main() -> None:
     data = Path(os.environ.setdefault("RECALL_DATA_DIR", str(_default_data_dir())))
     data.mkdir(parents=True, exist_ok=True)
     _redirect_output(data)
-    preferred = int(os.environ.get("RECALL_PORT") or DEFAULT_PORT)
+
+    from .config import load_settings
+
+    preferred = int(os.environ.get("RECALL_PORT") or load_settings().port or DEFAULT_PORT)
 
     # Already running (e.g. launched twice): just open it.
     if _running_recall(preferred):
         _open_browser(f"http://localhost:{preferred}/")
         return
 
-    import uvicorn
-
     from .app import create_app
 
-    port = _free_port(preferred)
-    url = f"http://localhost:{port}/"
-    server = uvicorn.Server(uvicorn.Config(create_app(), host=HOST, port=port, log_level="warning"))
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    deadline = time.monotonic() + 60
-    while not server.started:
-        if not thread.is_alive() or time.monotonic() > deadline:
-            raise SystemExit("Recall server failed to start; see recall.log in " + str(data))
-        time.sleep(0.05)
+    app = create_app()
+    launcher = Launcher(app)
+    app.state.launcher = launcher
+    try:
+        launcher.serve(_free_port(preferred))
+    except RuntimeError as e:
+        raise SystemExit(f"{e}; see recall.log in {data}")
 
-    print(f"Recall running at {url}")
-    _open_browser(url)
+    print(f"Recall running at {launcher.url}")
+    _open_browser(launcher.url)
 
-    def stop():
-        server.should_exit = True
-        thread.join(timeout=5)
-
-    if not _run_tray(url, stop):
-        thread.join()
+    if not _run_tray(launcher):
+        launcher.done.wait()
+    launcher.stop()
 
 
 if __name__ == "__main__":

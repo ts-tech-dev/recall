@@ -6,6 +6,7 @@
 //   viewer.js    Browse view (preview, outline, related)        editor.js  note editor
 //   ask.js       Ask view (answers, sources, history)           files.js   new note / move dialogs
 //   graph.js     Graph view                                     theme.js   Auto / Light / Grey / Dark
+//   appctl.js    Windows app: port and shut down
 
 import { state } from "./state.js";
 import { bindAsk, renderHistory, renderTypeChips } from "./ask.js";
@@ -16,6 +17,7 @@ import { bindStatus, refreshStatus } from "./status.js";
 import { bindTree, loadTree } from "./tree.js";
 import { bindViewer, route } from "./viewer.js";
 import { bindTheme } from "./theme.js";
+import { bindAppControls } from "./appctl.js";
 
 bindTheme();
 bindViewer();
@@ -25,6 +27,7 @@ bindStatus();
 bindAsk();
 bindEditor();
 bindGraph();
+bindAppControls();
 
 await refreshStatus();
 renderTypeChips();

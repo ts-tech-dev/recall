@@ -5,8 +5,9 @@
     search.py   search, related notes, graph
     edit.py     reading/saving sources, new notes, moving, task checkboxes, uploads, versions
     ask.py      most relevant passages for a question (server-sent events)
+    control.py  the Windows app's port change and shutdown
 """
 
-from . import ask, edit, files, search, status
+from . import ask, control, edit, files, search, status
 
-routers = [status.router, files.router, search.router, edit.router, ask.router]
+routers = [status.router, files.router, search.router, edit.router, ask.router, control.router]

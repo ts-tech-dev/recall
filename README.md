@@ -44,8 +44,12 @@ powershell -ExecutionPolicy Bypass -File packaging\build-windows.ps1
 
 This creates `dist\Recall\Recall.exe` (copy the whole `dist\Recall` folder, or `dist\Recall-windows.zip`).
 It starts Recall and opens it in your default browser (Edge, Chrome…) at http://localhost:9999. Bookmark that
-address. A tray icon (bottom-right, near the clock) has *Open Recall* and *Quit*. Starting `Recall.exe` again while it
-is running just opens the browser. If port 9999 is taken, set the `RECALL_PORT` environment variable. Data is stored
+address. The first time, Settings opens so you can pick the notes folder and the **port** Recall runs on. You can
+change the port later in Settings (*App*). Recall then restarts at the new address and the page follows it.
+Questions, the theme and other choices saved in the browser are kept per address. The **⏻** button in the top bar
+(or *Shut down Recall* in Settings) closes the app. A tray icon (bottom-right, near the clock) has *Open Recall* and
+*Quit*. Starting `Recall.exe` again while it is running just opens the browser. If the port is taken when Recall
+starts, it picks a free one. The `RECALL_PORT` environment variable overrides the setting. Data is stored
 in `%LOCALAPPDATA%\Recall`, and logs go to `recall.log` there. Set the notes folder in **Settings**, for example `C:\Users\you\Notes`.
 To run the same launcher from source on any OS, use `python -m recall.desktop`.
 
@@ -124,10 +128,10 @@ Each piece lives in its own file, so it can be changed without touching the rest
 | Path | What it does |
 | --- | --- |
 | `recall/__main__.py` | Command line: `python -m recall` |
-| `recall/desktop.py` | Windows app launcher: server + browser + tray icon |
+| `recall/desktop.py` | Windows app launcher: server + browser + tray icon, port changes and shut down |
 | `recall/app.py` | Builds the FastAPI app: request guard, routers, static files |
 | `recall/state.py` | Settings, the open index and the folder watcher, shared by the routes |
-| `recall/api/` | HTTP API, one router per area: `status`, `files`, `search`, `edit`, `ask` |
+| `recall/api/` | HTTP API, one router per area: `status`, `files`, `search`, `edit`, `ask`, `control` (app port, shut down) |
 | `recall/extractors/` | One module per file format (`markdown`, `pdf`, `docx`, `pptx`, `sheets`, `html`); register new ones in `__init__.py` |
 | `recall/index/` | The index: `core` (database, files), `build` (indexing), `search`, `graph`, `query` (filters), `schema` |
 | `recall/chunker.py` | Splits Markdown into heading-scoped chunks |
@@ -170,6 +174,7 @@ The fixtures generate a sample notes folder covering every file type, with image
 | `test_images.py` | OCR (images, scanned PDFs, cache), loose versus embedded images, text folded into passages |
 | `test_watcher.py` | Create, modify and delete picked up live; bursts debounced; hidden files ignored |
 | `test_graph.py` | Links and backlinks, updates after edits, dangling links, graph nodes and edges, similarity edges |
+| `test_desktop.py` | App port setting, moving to another port, shutting down, the API for both |
 | `test_editing.py` | Save, conflict and force, versions, unsafe paths, new notes, moves and link updates, folders, image uploads, timestamp precision, API flow |
 
 See `PLAN.md` for the design and roadmap.

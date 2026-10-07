@@ -28,6 +28,8 @@
 .btn.small { padding: 4px 10px; font-size: 13px; }
 .icon-btn { border: 0; background: none; color: var(--text); font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
 .icon-btn:hover { background: var(--accent-soft); }
+.icon-btn svg { display: block; }
+#shutdown:hover { color: var(--danger); }
 .only-narrow { display: none; }
 .theme-select { padding: 4px 8px; font-size: 13px; }
 
