@@ -118,16 +118,19 @@ export function scrollToAnchor(anchor, tries = 0) {
 }
 
 export async function loadRelated(path) {
-  const box = $("#related");
-  box.innerHTML = "";
+  const box = $("#related"), similar = $("#doc-similar");
+  box.innerHTML = ""; similar.hidden = true;
   let r;
   try { r = await api("/api/related?path=" + encodeURIComponent(path)); } catch { return; }
   if (state.currentDoc !== path) return;
   const list = (title, items, extra = () => "") => items.length
     ? `<h4>${title}</h4><ul>${items.map(i => `<li><a href="#" data-path="${esc(i.path)}" title="${esc(i.path)}">${esc(i.title)}${extra(i)}</a></li>`).join("")}</ul>`
     : "";
-  box.innerHTML = list("Linked from", r.backlinks) + list("Links to", r.outgoing) +
-    list("Similar notes", r.similar, i => ` <span class="pct">${Math.round(i.similarity * 100)}%</span>`);
+  box.innerHTML = list("Linked from", r.backlinks) + list("Links to", r.outgoing);
+  // Similar notes: a small line under the note.
+  similar.innerHTML = r.similar.length ? "Similar notes: " + r.similar.map(i =>
+    `<a href="#" data-path="${esc(i.path)}" title="${esc(i.path)}">${esc(i.title)}</a> <span class="pct">${Math.round(i.similarity * 100)}%</span>`).join(" · ") : "";
+  similar.hidden = !r.similar.length;
 }
 
 export function route() {
@@ -152,7 +155,7 @@ export function bindViewer() {
     const tag = e.target.closest("a.tag");
     if (tag) { e.preventDefault(); $("#side-q").value = "#" + tag.dataset.tag; sideSearch(tag.dataset.tag); $("#sidebar").classList.add("open"); }
   });
-  $("#related").addEventListener("click", e => {
+  for (const id of ["#related", "#doc-similar"]) $(id).addEventListener("click", e => {
     const a = e.target.closest("a[data-path]");
     if (a) { e.preventDefault(); openDoc(a.dataset.path); }
   });

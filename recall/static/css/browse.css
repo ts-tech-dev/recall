@@ -26,5 +26,10 @@
 .related a { display: block; font-size: 13px; color: var(--text); text-decoration: none; padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .related a:hover { color: var(--accent); }
 .related .pct { color: var(--muted); font-size: 11px; }
+.doc-main { min-width: 0; }
+.doc-similar { max-width: 900px; margin: 10px 4px 0; line-height: 1.6; }
+.doc-similar a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--border); }
+.doc-similar a:hover { color: var(--accent); }
+.doc-similar .pct { font-size: 11px; opacity: .8; }
 .changed-banner, .editor-conflict { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .editor-conflict { border-color: var(--danger); }

@@ -84,7 +84,7 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
   re-index within about 2 seconds. The open note and the file tree refresh on their own.
 - **Graph**: every note is a node. Solid lines are links (`[[wikilinks]]`, relative Markdown links) and dashed
   lines are similar-topic connections from the embeddings. You can highlight, focus on the current note,
-  hide unconnected notes and click to open. Each note also shows *Linked from*, *Links to* and *Similar notes*.
+  hide unconnected notes and click to open. Each note also shows *Linked from* and *Links to* beside it, and a short *Similar notes* line under it.
 - **Editing**: edit Markdown and text notes with a live preview. Paste, drop or pick images and they are saved in an
   `images` folder next to the note (created if it doesn't exist yet) and linked as `images/<name>`. Ctrl+S saves. If the file changed on disk since you opened it, you're
   asked before anything is overwritten. The last 30 versions of each note are kept (*History…*). *+ Note*
