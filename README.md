@@ -65,6 +65,8 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
   `==highlights==`, `%%comments%%`, `#tags` (click to search), `:emoji:` shortcodes, definition lists
   (`Term` then `: definition`), image sizes (`![alt|300](pic.png)`, `![[pic.png|300]]`) and heading ids
   (`## Title {#id}`).
+- **Themes**: pick *Auto* (follows your system), *Light*, *Grey* or *Dark* from the menu in the top bar. The choice is
+  remembered by the browser.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to
   the file straight away (with version history, and only if the file hasn't changed on disk since it was shown).
   In the editor's preview, ticking a box changes the text, which you then save.

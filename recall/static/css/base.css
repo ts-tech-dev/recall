@@ -1,4 +1,5 @@
-/* Colors (light/dark), fonts and form controls shared by everything. */
+/* Colors (light, grey and dark themes), fonts and form controls shared by everything.
+   The theme is set on <html data-theme="…"> by js/theme.js; Auto picks light or dark from the system. */
 
 :root {
   --bg: #f7f8fa;
@@ -15,21 +16,33 @@
   --radius: 10px;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12151b;
-    --panel: #1a1e26;
-    --text: #e4e7ec;
-    --muted: #98a2b3;
-    --border: #2b313d;
-    --accent: #6a9cf4;
-    --accent-soft: #1f2d48;
-    --mark: #5a4b12;
-    --danger: #f07070;
-    --code-bg: #232833;
-    --shadow: none;
-    color-scheme: dark;
-  }
+:root[data-theme="grey"] {
+  --bg: #2c2e33;
+  --panel: #37393f;
+  --text: #e3e5e8;
+  --muted: #a6abb3;
+  --border: #4a4d55;
+  --accent: #7aa7f7;
+  --accent-soft: #3b4659;
+  --mark: #6b5d1f;
+  --danger: #f28b82;
+  --code-bg: #303237;
+  --shadow: none;
+  color-scheme: dark;
+}
+:root[data-theme="dark"] {
+  --bg: #12151b;
+  --panel: #1a1e26;
+  --text: #e4e7ec;
+  --muted: #98a2b3;
+  --border: #2b313d;
+  --accent: #6a9cf4;
+  --accent-soft: #1f2d48;
+  --mark: #5a4b12;
+  --danger: #f07070;
+  --code-bg: #232833;
+  --shadow: none;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }

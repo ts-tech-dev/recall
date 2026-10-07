@@ -2,6 +2,7 @@
 // code highlighting, ```math blocks, Mermaid diagrams and link behavior. Each step is one function.
 
 import { $$, slugify } from "../util.js";
+import { isDark } from "../theme.js";
 
 /** Heading ids for the outline and #links. "## Title {#custom-id}" sets the id explicitly. */
 export function headingIds(el) {
@@ -124,8 +125,7 @@ function loadMermaid() {
     const s = document.createElement("script");
     s.src = "/static/vendor/mermaid.min.js";  // large, so only loaded when a note has a diagram
     s.onload = () => {
-      const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default" });
+      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: isDark() ? "dark" : "default" });
       resolve(window.mermaid);
     };
     s.onerror = reject;

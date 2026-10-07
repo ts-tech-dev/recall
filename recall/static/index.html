@@ -5,8 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recall</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6fdf'/><path d='M9 8h9a5 5 0 0 1 0 10h-3l6 6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 8v16' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>">
-<link rel="stylesheet" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)">
-<link rel="stylesheet" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script>
+  // Apply the saved color theme before the page paints (see js/theme.js).
+  (() => {
+    let t = "auto";
+    try { t = localStorage.getItem("theme") || "auto"; } catch {}
+    if (t === "auto") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<link rel="stylesheet" id="hljs-light" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" id="hljs-dark" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="/static/css/base.css">
 <link rel="stylesheet" href="/static/css/layout.css">
@@ -30,6 +39,9 @@
   <div class="spacer"></div>
   <div class="status" id="status" title="Index status"></div>
   <button class="btn ghost" id="reindex" title="Scan the notes folder for new or changed files">Re-index</button>
+  <select id="theme" class="theme-select" aria-label="Color theme" title="Color theme">
+    <option value="auto">Auto</option><option value="light">Light</option><option value="grey">Grey</option><option value="dark">Dark</option>
+  </select>
   <button class="icon-btn" id="open-settings" title="Settings" aria-label="Settings">⚙</button>
 </header>
 

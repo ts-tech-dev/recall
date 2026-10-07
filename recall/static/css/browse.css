@@ -7,8 +7,8 @@
 .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .tag { font-size: 12px; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 8px; }
 .doc-body { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 24px; align-items: start; }
-#doc-content { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 30px; box-shadow: var(--shadow); max-width: 900px; }
-#doc-content.full { padding: 0; overflow: hidden; max-width: none; }
+#doc-content { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 30px; box-shadow: var(--shadow); }
+#doc-content.full { padding: 0; overflow: hidden; }
 #doc-content iframe { width: 100%; height: calc(100vh - 190px); border: 0; display: block; }
 #doc-content > img.solo { margin: 0 auto; cursor: default; }
 .toc { position: sticky; top: 12px; font-size: 13px; max-height: calc(100vh - 120px); overflow: auto; }
@@ -27,7 +27,7 @@
 .related a:hover { color: var(--accent); }
 .related .pct { color: var(--muted); font-size: 11px; }
 .doc-main { min-width: 0; }
-.doc-similar { max-width: 900px; margin: 10px 4px 0; line-height: 1.6; }
+.doc-similar { margin: 10px 4px 0; line-height: 1.6; }
 .doc-similar a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--border); }
 .doc-similar a:hover { color: var(--accent); }
 .doc-similar .pct { font-size: 11px; opacity: .8; }
