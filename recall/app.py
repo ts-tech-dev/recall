@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .api import routers
 from .editing import EditError
+from .net import setup_network
 from .state import State
 
 log = logging.getLogger("recall")
@@ -24,6 +25,7 @@ ALLOWED_HOSTS = {"localhost", "127.0.0.1", "[::1]", "testserver"} | {
 
 
 def create_app(auto_index: bool = True) -> FastAPI:
+    setup_network()  # offline unless RECALL_ALLOW_DOWNLOADS is set
     app = FastAPI(title="Recall", version=__version__)
     state = State(background=auto_index)
     app.state.recall = state

@@ -62,6 +62,7 @@ jobs:
           Get-Content smoke-data\recall.log -ErrorAction SilentlyContinue
           if (-not $ok) { throw "Recall.exe did not index the sample note" }
           if ($r.results.Count -lt 1) { throw "search returned no results" }
+          if (-not $s.index.semantic) { throw "smart search is off (bundled model not loaded offline): $($s.index.embed_error)" }
           Write-Host "Indexed $($s.index.docs) note(s); search OK; semantic=$($s.index.semantic)"
       - uses: actions/upload-artifact@v4
         with:

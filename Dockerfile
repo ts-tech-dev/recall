@@ -13,13 +13,16 @@ RUN grep -v -E '^(pytest|httpx)' requirements.txt > /tmp/req.txt \
  # rapidocr pulls in the GUI OpenCV, which needs X11 libraries; keep only the headless build
  && pip uninstall -y opencv-python \
  && pip install --no-cache-dir --force-reinstall --no-deps opencv-python-headless
+# The search models are built into the image (~300 MB); Recall runs offline and never downloads them.
+COPY recall/__init__.py recall/config.py recall/net.py recall/fetch_models.py ./recall/
+RUN python -m recall.fetch_models
 COPY recall ./recall
 
 RUN useradd --uid 1000 --create-home recall \
  && mkdir -p /data /notes && chown recall:recall /data /notes
 USER recall
 
-# Settings, index, extracted images and the downloaded embedding model live in /data.
+# Settings, index and extracted images live in /data.
 ENV RECALL_DATA_DIR=/data \
     RECALL_NOTES_DIR=/notes \
     PYTHONUNBUFFERED=1

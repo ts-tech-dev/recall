@@ -6,7 +6,8 @@ import threading
 
 import numpy as np
 
-from .config import model_dir
+from .config import downloads_allowed, model_dir
+from .net import model_load_error
 
 
 class Embedder:
@@ -42,7 +43,16 @@ class FastEmbedEmbedder(Embedder):
             if self._model is None:
                 from fastembed import TextEmbedding
 
-                self._model = TextEmbedding(self.name, cache_dir=str(model_dir()))
+                try:
+                    # offline: only the model folder is read, never the network
+                    self._model = TextEmbedding(
+                        self.name, cache_dir=str(model_dir()), local_files_only=not downloads_allowed()
+                    )
+                except Exception as e:
+                    err = model_load_error(self.name, e)
+                    if err is e:
+                        raise
+                    raise err from e
             return self._model
 
     def embed_passages(self, texts: list[str]) -> np.ndarray:

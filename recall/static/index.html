@@ -197,21 +197,17 @@
     </fieldset>
     <fieldset>
       <legend>Search &amp; indexing (runs locally)</legend>
-      <label class="check"><input type="checkbox" name="semantic_search"> Search by meaning (local embedding model, downloaded once)</label>
+      <label class="check"><input type="checkbox" name="semantic_search"> Search by meaning (local embedding model, comes with Recall)</label>
       <label>Embedding model <input name="embed_model" list="embed-models" autocomplete="off">
-        <span class="hint">Changing it re-processes every note.</span>
+        <span class="hint">Changing it re-processes every note. Other models must be added to Recall first.</span>
       </label>
       <datalist id="embed-models">
         <option value="BAAI/bge-base-en-v1.5">English, best results (~210 MB)</option>
-        <option value="BAAI/bge-small-en-v1.5">English, faster (~70 MB)</option>
-        <option value="intfloat/multilingual-e5-large">Many languages (~2.2 GB)</option>
       </datalist>
       <label class="check"><input type="checkbox" name="rerank"> Re-rank results with a local model for better ordering (~80&nbsp;MB, about half a second per search)</label>
       <label>Re-ranking model <input name="rerank_model" list="rerank-models" autocomplete="off"></label>
       <datalist id="rerank-models">
         <option value="Xenova/ms-marco-MiniLM-L-6-v2">English, fast (~80 MB)</option>
-        <option value="Xenova/ms-marco-MiniLM-L-12-v2">English, slower (~120 MB)</option>
-        <option value="jinaai/jina-reranker-v2-base-multilingual">Many languages (~1.1 GB)</option>
       </datalist>
       <label class="check"><input type="checkbox" name="ocr"> Read text in images and scanned PDFs (OCR)</label>
       <label class="check"><input type="checkbox" name="watch"> Re-index automatically when files change</label>

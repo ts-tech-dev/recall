@@ -13,6 +13,7 @@ that run on your CPU.
 ```bash
 cd /srv/projects/recall
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m recall.fetch_models     # once: puts the search models in ./models (~300 MB)
 .venv/bin/python -m recall --notes ~/notes # then open http://localhost:9999
 ```
 
@@ -30,8 +31,8 @@ cp .env.example .env   # set NOTES_DIR, and RECALL_BIND / RECALL_ALLOWED_HOSTS t
 docker compose up -d --build   # then open http://localhost:9999 (RECALL_PORT in .env)
 ```
 
-Notes are mounted at `/notes` and edited as uid 1000. Settings, the index and the embedding model are kept
-in the `recall-data` volume. Recall has no login, so publish it only on an address you trust (localhost or a
+Notes are mounted at `/notes` and edited as uid 1000. Settings and the index are kept in the `recall-data`
+volume. The search models are built into the image, so the container needs no internet. Recall has no login, so publish it only on an address you trust (localhost or a
 Tailscale IP), not `0.0.0.0` on a shared network.
 
 ## Windows app
@@ -52,6 +53,14 @@ Questions, the theme and other choices saved in the browser are kept per address
 starts, it picks a free one. The `RECALL_PORT` environment variable overrides the setting. Data is stored
 in `%LOCALAPPDATA%\Recall`, and logs go to `recall.log` there. Set the notes folder in **Settings**, for example `C:\Users\you\Notes`.
 To run the same launcher from source on any OS, use `python -m recall.desktop`.
+
+**Offline.** Recall never connects to the internet. The smart search and re-ranking models are packed into the
+app (in `models\` inside `dist\Recall`, about 300 MB), the Docker image and, after `python -m recall.fetch_models`, a
+source checkout, and they are only ever read from there. Notes, searches and questions stay on the machine.
+Settings only offers the models Recall came with. To use another one, add it with
+`python -m recall.fetch_models <model name>` before building. `RECALL_MODEL_DIR` points at a different models folder.
+To let Recall download models it doesn't have (the old behavior), set `RECALL_ALLOW_DOWNLOADS=1`. It then uses
+the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company proxies.
 
 ## Features
 
@@ -74,8 +83,8 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to
   the file straight away (with version history, and only if the file hasn't changed on disk since it was shown).
   In the editor's preview, ticking a box changes the text, which you then save.
-- **Smart search (by meaning)**: a local embedding model (`BAAI/bge-base-en-v1.5`, about 210 MB, downloaded
-  once, CPU only) finds passages that mean the same thing even without shared words. For example, "power outage
+- **Smart search (by meaning)**: a local embedding model (`BAAI/bge-base-en-v1.5`, about 210 MB, comes
+  with Recall, CPU only) finds passages that mean the same thing even without shared words. For example, "power outage
   protection" finds a note about a UPS battery. Results are merged with keyword ranking, then a local re-ranking
   model (`ms-marco-MiniLM-L-6-v2`, about 80 MB) reads the question with each top passage and puts the best
   answers first (about half a second per search; it can be turned off in Settings). The sidebar search has

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import threading
 
-from .config import model_dir
+from .config import downloads_allowed, model_dir
+from .net import model_load_error
 
 DEFAULT_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2"  # ~80 MB, English
 
@@ -33,7 +34,16 @@ class FastEmbedReranker(Reranker):
             if self._model is None:
                 from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-                self._model = TextCrossEncoder(self.name, cache_dir=str(model_dir()))
+                try:
+                    # offline: only the model folder is read, never the network
+                    self._model = TextCrossEncoder(
+                        self.name, cache_dir=str(model_dir()), local_files_only=not downloads_allowed()
+                    )
+                except Exception as e:
+                    err = model_load_error(self.name, e)
+                    if err is e:
+                        raise
+                    raise err from e
             return self._model
 
     def score(self, query: str, passages: list[str]) -> list[float]:

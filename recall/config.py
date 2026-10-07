@@ -10,8 +10,19 @@ from pathlib import Path
 INT_LIMITS = {"top_k": (1, 50), "port": (1024, 65535)}
 
 
+# The models that ship with Recall (Windows app, Docker image; `python -m recall.fetch_models` for a source checkout).
+BUNDLED_MODELS = Path(__file__).resolve().parent.parent / "models"
+
+
+def downloads_allowed() -> bool:
+    """Recall is offline unless RECALL_ALLOW_DOWNLOADS is set: models are only read from disk, never downloaded."""
+    return os.environ.get("RECALL_ALLOW_DOWNLOADS", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def model_dir() -> Path:
-    """Where downloaded local models (embeddings) are cached."""
+    """Where the local models (embeddings, re-ranking) are: RECALL_MODEL_DIR, the bundled ones, or the data folder."""
+    if not os.environ.get("RECALL_MODEL_DIR") and BUNDLED_MODELS.is_dir():
+        return BUNDLED_MODELS
     d = Path(os.environ.get("RECALL_MODEL_DIR", data_dir() / "models")).expanduser()
     d.mkdir(parents=True, exist_ok=True)
     return d

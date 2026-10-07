@@ -7,6 +7,11 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 root = os.path.abspath(os.path.join(SPECPATH, ".."))
 datas = [(os.path.join(root, "recall", "static"), os.path.join("recall", "static"))]
+# The app is offline: it ships the search models (fetched by build-windows.ps1) and never downloads them.
+models = os.path.join(root, "models")
+if not os.path.isdir(models):
+    sys.exit("models/ is missing: run python -m recall.fetch_models first")
+datas.append((models, "models"))
 binaries = []
 hiddenimports = collect_submodules("recall") + collect_submodules("uvicorn")
 

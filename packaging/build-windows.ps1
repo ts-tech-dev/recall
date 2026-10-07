@@ -14,6 +14,8 @@ Run $py -m pip install -r requirements.txt -r packaging\requirements-desktop.txt
 # rapidocr also pulls in opencv-python; both install into cv2\, so keep just one copy
 Run $py -m pip uninstall -y opencv-python
 Run $py -m pip install --force-reinstall --no-deps opencv-python-headless
+# The search models ship inside the app, which never downloads anything
+Run $py -m recall.fetch_models
 Run $py -m PyInstaller --noconfirm --clean packaging\recall.spec
 
 Compress-Archive -Path dist\Recall -DestinationPath dist\Recall-windows.zip -Force
