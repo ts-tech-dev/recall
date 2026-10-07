@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shutil
 import tempfile
 import time
 from pathlib import Path
 from urllib.parse import quote, unquote
 
-from .extractors import EXTERNAL_RE, HTML_IMG_RE, MD_IMAGE_RE, MD_LINK_RE, split_code
+from .extractors import EXTERNAL_RE, HTML_IMG_RE, IMAGE_EXTS, MD_IMAGE_RE, MD_LINK_RE, split_code
 from .index import SKIP_DIRS
 
 EDITABLE_EXTS = {".md", ".markdown", ".txt"}
@@ -158,13 +159,12 @@ def _folder(root: Path, rel: str) -> Path:
     return root.resolve() if not rel else inside(root, rel)
 
 
-def _retarget(md: str, root: Path, base_old: Path, base_new: Path, moved: tuple[Path, Path]) -> str:
+def _retarget(md: str, root: Path, base_old: Path, base_new: Path, moved: dict[Path, Path]) -> str:
     """Rewrite relative link/image targets in `md` so they still point at the same files.
 
     `base_old`/`base_new` are the note's folder before and after a move (equal for notes that only link
-    to the moved file); links to `moved[0]` are pointed at `moved[1]`. Broken and external links are kept.
+    to the moved files); links to a key of `moved` are pointed at its value. Broken and external links are kept.
     """
-    old, new = moved
 
     def fix(target: str) -> str | None:
         if EXTERNAL_RE.match(target):
@@ -177,8 +177,8 @@ def _retarget(md: str, root: Path, base_old: Path, base_new: Path, moved: tuple[
             dest = ((root / unquote(path).lstrip("/")) if absolute else (base_old / unquote(path))).resolve()
         except OSError:
             return None
-        if dest == old:
-            dest = new
+        if dest in moved:
+            dest = moved[dest]
         elif base_old == base_new or absolute or not dest.exists():
             return None
         rel = Path(os.path.relpath(dest, root if absolute else base_new)).as_posix()
@@ -202,11 +202,84 @@ def _retarget(md: str, root: Path, base_old: Path, base_new: Path, moved: tuple[
     return "".join(parts)
 
 
+def _image_targets(md: str, base: Path) -> set[Path]:
+    """Local image files that `md` (a note in folder `base`) shows through relative Markdown or HTML images."""
+    out = set()
+    for is_code, seg in split_code(md):
+        if is_code:
+            continue
+        targets = [m.group(2) for m in MD_IMAGE_RE.finditer(seg)] + [m.group(3) for m in HTML_IMG_RE.finditer(seg)]
+        for t in targets:
+            path = re.match(r"[^#?]*", t).group(0)
+            if not path or EXTERNAL_RE.match(t) or path.startswith("/"):
+                continue
+            try:
+                p = (base / unquote(path)).resolve()
+            except OSError:
+                continue
+            if p.suffix.lower() in IMAGE_EXTS and p.is_file():
+                out.add(p)
+    return out
+
+
+def _notes(root: Path):
+    for d, files in _walk(root):
+        for f in files:
+            if Path(f).suffix.lower() in MARKDOWN_EXTS:
+                yield d, d / f
+
+
+def _move_images(root: Path, src: Path, dest_dir: Path, text: str) -> dict[Path, Path]:
+    """Bring along the images a note shows from its own folder or the `images` folder next to it.
+
+    They keep their place relative to the note. An image another note also shows is copied instead, so that
+    note keeps working. Returns {old path: new path}.
+    """
+    own = {p for p in _image_targets(text, src.parent)
+           if p.parent == src.parent or p.is_relative_to(src.parent / IMAGES_DIR)}
+    if not own:
+        return {}
+    shared = set()
+    names = {n for p in own for n in (p.name, quote(p.name))}
+    for d, p in _notes(root):
+        if p == src:
+            continue
+        try:
+            other = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(n in other for n in names):
+            shared |= own & _image_targets(other, d)
+    moved = {}
+    for img in sorted(own):
+        target = dest_dir / img.relative_to(src.parent)
+        n = 1
+        while target.exists() and target.read_bytes() != img.read_bytes():
+            target = target.with_name(f"{img.stem}-{n}{img.suffix}")
+            n += 1
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if img in shared:
+            if not target.exists():
+                shutil.copy2(img, target)
+        elif target.exists():  # the same image is already there
+            img.unlink()
+        else:
+            os.replace(img, target)
+        if img not in shared:  # drop folders (like `images`) the move left empty
+            for d in img.parents:
+                if d == src.parent or not d.is_relative_to(src.parent) or any(d.iterdir()):
+                    break
+                d.rmdir()
+        moved[img] = target
+    return moved
+
+
 def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
     """Move a file into another folder (created if needed), keeping relative links working.
 
-    Links inside a moved Markdown note are rewritten for its new location, and relative links to the file
-    from other Markdown notes are updated. Wiki links ([[name]]) find notes by name, so they need no change.
+    Links inside a moved Markdown note are rewritten for its new location, and the images it shows from its
+    own folder move with it (see `_move_images`). Relative links to the file from other Markdown notes are
+    updated. Wiki links ([[name]]) find notes by name, so they need no change.
     """
     root = root.resolve()
     src = inside(root, rel)
@@ -219,12 +292,15 @@ def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
     if dest.exists():
         raise EditError(f"{dest.relative_to(root).as_posix()} already exists", 409)
     dest_dir.mkdir(parents=True, exist_ok=True)
+    images: dict[Path, Path] = {}
+    if src.suffix.lower() in MARKDOWN_EXTS:
+        images = _move_images(root, src, dest_dir, src.read_text(encoding="utf-8", errors="replace"))
     os.replace(src, dest)
     new_rel = dest.relative_to(root).as_posix()
 
     if dest.suffix.lower() in MARKDOWN_EXTS:
         text = dest.read_text(encoding="utf-8", errors="replace")
-        fixed = _retarget(text, root, src.parent, dest_dir, (src, dest))
+        fixed = _retarget(text, root, src.parent, dest_dir, {src: dest, **images})
         if fixed != text:
             _atomic_write(dest, fixed.encode("utf-8"))
 
@@ -241,7 +317,7 @@ def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
                 continue
             if not any(n in text for n in needles):
                 continue
-            fixed = _retarget(text, root, d, d, (src, dest))
+            fixed = _retarget(text, root, d, d, {src: dest})
             if fixed != text:
                 _atomic_write(p, fixed.encode("utf-8"))
                 updated.append(p.relative_to(root).as_posix())
@@ -250,7 +326,8 @@ def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
     if old_vd.is_dir() and not new_vd.exists():
         old_vd.rename(new_vd)
         (new_vd / "path.txt").write_text(new_rel)
-    return {"path": new_rel, "updated": sorted(updated)}
+    return {"path": new_rel, "updated": sorted(updated),
+            "images": sorted(p.relative_to(root).as_posix() for p in images.values())}
 
 
 def _safe_name(name: str) -> str:

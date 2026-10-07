@@ -75,8 +75,9 @@ export async function moveFile(path, folder) {
   if (state.scopePath === path) setScope(r.path);
   if (state.currentDoc === path) openDoc(r.path, "", { force: true });
   await loadTree();
-  const n = r.updated.length;
-  toast(`Moved to ${folder || "the top level"}` + (n ? ` · updated links in ${n} note${n > 1 ? "s" : ""}` : ""), 3500);
+  const n = r.updated.length, i = (r.images || []).length;
+  toast(`Moved to ${folder || "the top level"}` + (i ? ` with ${i} image${i > 1 ? "s" : ""}` : "") +
+    (n ? ` · updated links in ${n} note${n > 1 ? "s" : ""}` : ""), 3500);
 }
 
 export function moveCurrentDoc() {

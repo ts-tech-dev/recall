@@ -112,7 +112,7 @@ def test_move_updates_links_to_the_file(notes, tmp_path):
         "See [VLANs](networking/vlans.md#trunk-configuration), ![t](<networking/topology.png>) "
         "and [web](https://example.com/networking/vlans.md).\n\n```\n[code](networking/vlans.md)\n```\n")
     r = editing.move_file(notes, tmp_path / "v", "networking/vlans.md", "")
-    assert r == {"path": "vlans.md", "updated": ["index.md"]}
+    assert r == {"path": "vlans.md", "updated": ["index.md"], "images": []}
     text = (notes / "index.md").read_text()
     assert "[VLANs](vlans.md#trunk-configuration)" in text
     assert "](<networking/topology.png>)" in text and "https://example.com/networking/vlans.md" in text
@@ -216,3 +216,43 @@ def test_api_folders_and_move(api, notes):
     api.post("/api/index?wait=true", headers=H)
     assert api.get("/api/doc", params={"path": "archive/backups.md"}).status_code == 200
     assert api.post("/api/move", json={"path": "archive/backups.md", "folder": "archive"}, headers=H).status_code == 400
+
+
+def test_move_note_takes_its_images_along(notes, tmp_path):
+    (notes / "trips" / "images").mkdir(parents=True)
+    (notes / "trips" / "images" / "map.png").write_bytes(make_png())
+    (notes / "trips" / "beach.jpg").write_bytes(make_png(rgb=(9, 9, 9)))
+    (notes / "trips" / "rome.md").write_text(
+        "# Rome\n\n![map](images/map.png)\n\n<img src=\"beach.jpg\">\n\n![d](../images/vlan-diagram.png)\n")
+    r = editing.move_file(notes, tmp_path / "v", "trips/rome.md", "archive/2025")
+    assert r["images"] == ["archive/2025/beach.jpg", "archive/2025/images/map.png"]
+    assert (notes / "archive/2025/images/map.png").is_file() and (notes / "archive/2025/beach.jpg").is_file()
+    assert not (notes / "trips/images").exists() and not (notes / "trips/beach.jpg").exists()  # emptied folder removed
+    text = (notes / "archive/2025/rome.md").read_text()
+    assert "![map](images/map.png)" in text and '<img src="beach.jpg">' in text  # same place next to the note
+    assert "![d](../../images/vlan-diagram.png)" in text  # images from elsewhere stay put, link updated
+    assert (notes / "images/vlan-diagram.png").is_file()
+
+
+def test_move_note_copies_images_other_notes_use(notes, tmp_path):
+    (notes / "a" / "images").mkdir(parents=True)
+    (notes / "a" / "images" / "shared.png").write_bytes(make_png())
+    (notes / "a" / "one.md").write_text("![s](images/shared.png)\n")
+    (notes / "a" / "two.md").write_text("![s](images/shared.png)\n")
+    r = editing.move_file(notes, tmp_path / "v", "a/one.md", "b")
+    assert r["images"] == ["b/images/shared.png"]
+    assert (notes / "a/images/shared.png").is_file() and (notes / "b/images/shared.png").is_file()
+    assert (notes / "b/one.md").read_text() == "![s](images/shared.png)\n"
+    assert (notes / "a/two.md").read_text() == "![s](images/shared.png)\n"
+
+
+def test_move_note_image_name_clash(notes, tmp_path):
+    (notes / "a" / "images").mkdir(parents=True)
+    (notes / "a" / "images" / "pic.png").write_bytes(make_png())
+    (notes / "a" / "n.md").write_text("![p](images/pic.png)\n")
+    (notes / "b" / "images").mkdir(parents=True)
+    (notes / "b" / "images" / "pic.png").write_bytes(make_png(rgb=(1, 2, 3)))  # a different image
+    r = editing.move_file(notes, tmp_path / "v", "a/n.md", "b")
+    assert r["images"] == ["b/images/pic-1.png"]
+    assert (notes / "b/n.md").read_text() == "![p](images/pic-1.png)\n"
+    assert (notes / "b/images/pic.png").read_bytes() == make_png(rgb=(1, 2, 3))  # untouched

@@ -94,8 +94,10 @@ To run the same launcher from source on any OS, use `python -m recall.desktop`.
   creates a new note: pick the folder from a list, or make a new one. The **+** next to a folder in the file
   list creates the note in that folder.
 - **Moving files**: drag a file onto a folder in the file list, or onto empty space for the top level, or use
-  *Move…* on the open note. Relative links and images inside a moved note are updated, and so are relative
-  links to it from other notes. `[[Wiki links]]` find notes by name, so they keep working.
+  *Move…* on the open note. Images the note shows from its `images` folder, or from right next to it, move with
+  it and keep the same place beside the note (an image another note also uses is copied instead, and a folder left
+  empty is removed). Other relative links inside the note are updated, and so are relative links to it from other
+  notes. `[[Wiki links]]` and `![[embeds]]` find files by name, so they keep working.
 - **Incremental indexing**: only new or changed files are re-read, OCR'd and embedded, and when a note changes
   only the passages that changed are embedded again. Unreadable files are listed in the status bar.
 - **Fast with big files**: text is indexed first, so new notes are searchable within seconds; the text in images is
