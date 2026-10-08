@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shutil
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -21,13 +22,35 @@ from .schema import REBUILT_TABLES, SCHEMA, SCHEMA_VERSION
 from .search import SearchMixin
 
 SKIP_DIRS = {"node_modules", "__pycache__", "venv", ".venv"}
+_INDEX_FILE_RE = re.compile(r"([0-9a-f]{12})(\.db(-wal|-shm|-journal)?|_images|_versions|_extracted)")
+
+
+def _key(root: Path) -> str:
+    return hashlib.sha1(str(Path(root).resolve()).encode()).hexdigest()[:12]
+
+
+def prune_other_indexes(data_dir: Path, root: Path) -> None:
+    """Delete the index, caches and versions of every notes folder except `root` (left over from earlier folders).
+
+    A file still open elsewhere (Windows) is skipped and removed on a later start."""
+    base, keep = data_dir / "indexes", _key(root)
+    if not base.is_dir():
+        return
+    for p in base.iterdir():
+        m = _INDEX_FILE_RE.fullmatch(p.name)
+        if not m or m.group(1) == keep:
+            continue
+        try:
+            shutil.rmtree(p) if p.is_dir() else p.unlink()
+        except OSError:
+            pass
 
 
 
 class Index(BuildMixin, SearchMixin, GraphMixin):
     def __init__(self, root: Path, data_dir: Path, embedder: Embedder | None = None, ocr: bool = False):
         self.root = Path(root).resolve()
-        key = hashlib.sha1(str(self.root).encode()).hexdigest()[:12]
+        key = _key(self.root)
         base = data_dir / "indexes"
         base.mkdir(parents=True, exist_ok=True)
         self.db_path = base / f"{key}.db"

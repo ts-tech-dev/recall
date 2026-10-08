@@ -98,3 +98,19 @@ def test_launcher_moves_port_and_shuts_down(data, monkeypatch):
     finally:
         ln.stop()
     assert not answers(second)
+
+
+def test_log_is_trimmed_when_too_big(tmp_path, monkeypatch):
+    from recall import desktop
+
+    monkeypatch.setattr(desktop, "LOG_MAX_BYTES", 1000)
+    monkeypatch.setattr(desktop, "LOG_KEEP_BYTES", 300)
+    log = tmp_path / "recall.log"
+    log.write_text("".join(f"line {i}\n" for i in range(500)))
+    desktop._trim_log(log)
+    text = log.read_text()
+    assert len(text) < 400 and text.startswith("[earlier log lines removed]\nline ") and text.endswith("line 499\n")
+    small = tmp_path / "small.log"
+    small.write_text("hello\n")
+    desktop._trim_log(small)
+    assert small.read_text() == "hello\n"

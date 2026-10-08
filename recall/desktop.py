@@ -27,9 +27,28 @@ def _default_data_dir() -> Path:
     return Path.home() / ".recall"
 
 
+LOG_MAX_BYTES = 1_000_000  # recall.log is cut back to its last LOG_KEEP_BYTES when it grows past this
+LOG_KEEP_BYTES = 200_000
+
+
+def _trim_log(path: Path) -> None:
+    """Keep only the end of a log that has grown too big (it's appended to on every run)."""
+    try:
+        if path.stat().st_size <= LOG_MAX_BYTES:
+            return
+        with open(path, "rb") as f:
+            f.seek(-LOG_KEEP_BYTES, os.SEEK_END)
+            tail = f.read()
+        tail = tail[tail.find(b"\n") + 1:]  # start on a whole line
+        path.write_bytes(b"[earlier log lines removed]\n" + tail)
+    except OSError:
+        pass
+
+
 def _redirect_output(data: Path) -> None:
     # A windowed (no console) build has no stdout/stderr, and uvicorn's logging would crash on them.
     if sys.stdout is None or sys.stderr is None:
+        _trim_log(data / "recall.log")
         log = open(data / "recall.log", "a", buffering=1, encoding="utf-8")
         sys.stdout = sys.stdout or log
         sys.stderr = sys.stderr or log

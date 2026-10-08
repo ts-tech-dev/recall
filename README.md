@@ -51,7 +51,8 @@ Questions, the theme and other choices saved in the browser are kept per address
 (or *Shut down Recall* in Settings) closes the app. A tray icon (bottom-right, near the clock) has *Open Recall* and
 *Quit*. Starting `Recall.exe` again while it is running just opens the browser. If the port is taken when Recall
 starts, it picks a free one. The `RECALL_PORT` environment variable overrides the setting. Data is stored
-in `%LOCALAPPDATA%\Recall`, and logs go to `recall.log` there. Set the notes folder in **Settings**, for example `C:\Users\you\Notes`.
+in `%LOCALAPPDATA%\Recall`, and logs go to `recall.log` there (cut back to its last 200 KB at start-up once it passes 1 MB).
+When you switch to another notes folder, the old folder's index, caches and history are deleted. Set the notes folder in **Settings**, for example `C:\Users\you\Notes`.
 To run the same launcher from source on any OS, use `python -m recall.desktop`.
 
 **Offline.** Recall never connects to the internet. The smart search and re-ranking models are packed into the
@@ -103,7 +104,7 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   the *Outline* button shows its headings beside it (remembered by the browser).
 - **Editing**: edit Markdown and text notes with a live preview. Paste, drop or pick images and they are saved in an
   `images` folder next to the note (created if it doesn't exist yet) and linked as `images/<name>`. Ctrl+S saves. If the file changed on disk since you opened it, you're
-  asked before anything is overwritten. The last 30 versions of each note are kept (*History…*). *+ Note*
+  asked before anything is overwritten. Versions saved in the last 4 hours are kept, up to 30 per note (*History…*); older ones are deleted. *+ Note*
   creates a new note: pick the folder from a list, or make a new one. The **+** next to a folder in the file
   list creates the note in that folder.
 - **Moving files**: drag a file onto a folder in the file list, or onto empty space for the top level, or use

@@ -13,7 +13,8 @@ from .embeddings import available as embeddings_available
 from .rerank import FastEmbedReranker
 from .rerank import available as rerank_available
 from .images import ocr_available
-from .index import Index
+from .editing import prune_versions
+from .index import Index, prune_other_indexes
 from .watcher import Watcher
 
 
@@ -60,7 +61,9 @@ class State:
             sig = (str(Path(nd).resolve()), s.semantic_search, s.embed_model, s.ocr, s.watch)
             if self.index is None or sig != self._signature:
                 self._close()
+                prune_other_indexes(data_dir(), Path(nd))
                 self.index = Index(Path(nd), data_dir(), embedder=self._embedder(), ocr=s.ocr and ocr_available())
+                prune_versions(self.index.versions_dir)
                 self._signature = sig
                 if s.watch and self.background:
                     self.watcher = Watcher(self.index)

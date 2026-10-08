@@ -48,6 +48,28 @@ def test_versions_kept_and_capped(notes, tmp_path, monkeypatch):
         editing.read_version(v, "backups.md", "../../etc")
 
 
+def test_versions_older_than_max_age_are_hidden_and_deleted(notes, tmp_path):
+    import time
+
+    v = tmp_path / "v"
+    editing.save_source(notes, v, "backups.md", "recent", None)
+    vd = next(v.iterdir())
+    old = vd / f"{time.time_ns() - (editing.VERSION_MAX_AGE + 60) * 10**9}.bak"
+    old.write_text("old")
+    with pytest.raises(EditError):
+        editing.read_version(v, "backups.md", old.stem)
+    assert len(editing.list_versions(v, "backups.md")) == 1
+    assert not old.exists()
+
+
+def test_prune_versions_sweeps_notes_not_edited_since(notes, tmp_path, monkeypatch):
+    v = tmp_path / "v"
+    editing.save_source(notes, v, "backups.md", "edited", None)
+    monkeypatch.setattr(editing, "VERSION_MAX_AGE", -1)
+    editing.prune_versions(v)
+    assert list(v.iterdir()) == []  # the emptied note folder is removed too
+
+
 @pytest.mark.parametrize("rel,status", [
     ("../outside.md", 400), ("/etc/passwd", 415), (".hidden/secret.md", 400), ("k8s-upgrade.pdf", 415), ("", 400)])
 def test_unsafe_or_uneditable_paths(notes, tmp_path, rel, status):

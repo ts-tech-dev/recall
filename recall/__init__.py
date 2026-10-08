@@ -1,3 +1,3 @@
 """Recall: a local knowledge base over a directory of notes."""
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"

@@ -21,6 +21,7 @@ MAX_NOTE_BYTES = 5_000_000
 MAX_UPLOAD_BYTES = 25_000_000
 IMAGES_DIR = "images"  # uploads go to this folder next to the note
 KEEP_VERSIONS = 30
+VERSION_MAX_AGE = 4 * 3600  # seconds; older saved versions are hidden and deleted
 
 
 class EditError(Exception):
@@ -77,6 +78,27 @@ def _version_dir(versions_root: Path, rel: str) -> Path:
     return versions_root / hashlib.sha1(rel.encode()).hexdigest()[:16]
 
 
+def _expired(f: Path) -> bool:
+    return int(f.stem) < time.time_ns() - VERSION_MAX_AGE * 10**9
+
+
+def _prune_version_dir(vd: Path) -> None:
+    """Delete versions older than VERSION_MAX_AGE (and beyond KEEP_VERSIONS); drop the folder once it's empty."""
+    baks = sorted(vd.glob("*.bak"))
+    for f in baks[:-KEEP_VERSIONS] + [f for f in baks[-KEEP_VERSIONS:] if _expired(f)]:
+        f.unlink(missing_ok=True)
+    if not any(vd.glob("*.bak")):
+        shutil.rmtree(vd, ignore_errors=True)
+
+
+def prune_versions(versions_root: Path) -> None:
+    """Delete expired versions of every note, including notes that haven't been edited since."""
+    if versions_root.is_dir():
+        for vd in versions_root.iterdir():
+            if vd.is_dir():
+                _prune_version_dir(vd)
+
+
 def save_source(root: Path, versions_root: Path, rel: str, content: str, base_mtime_ns: str | int | None,
                 force: bool = False) -> dict:
     """Write a note. Refuses (409) if the file changed on disk since `base_mtime_ns`, unless `force`."""
@@ -98,8 +120,7 @@ def save_source(root: Path, versions_root: Path, rel: str, content: str, base_mt
         vd.mkdir(parents=True, exist_ok=True)
         (vd / "path.txt").write_text(rel)
         (vd / f"{time.time_ns()}.bak").write_bytes(old)
-        for f in sorted(vd.glob("*.bak"))[:-KEEP_VERSIONS]:
-            f.unlink()
+        _prune_version_dir(vd)
     elif not force and base_mtime_ns is not None:
         raise EditError("The file was deleted on disk since you opened it", 409)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -109,6 +130,8 @@ def save_source(root: Path, versions_root: Path, rel: str, content: str, base_mt
 
 def list_versions(versions_root: Path, rel: str) -> list[dict]:
     vd = _version_dir(versions_root, rel)
+    if vd.is_dir():
+        _prune_version_dir(vd)
     out = []
     for f in sorted(vd.glob("*.bak"), reverse=True):
         out.append({"id": f.stem, "saved_at": int(f.stem) / 1e9, "size": f.stat().st_size})
@@ -119,7 +142,7 @@ def read_version(versions_root: Path, rel: str, vid: str) -> str:
     if not re.fullmatch(r"\d+", vid):
         raise EditError("Bad version id")
     f = _version_dir(versions_root, rel) / f"{vid}.bak"
-    if not f.is_file():
+    if not f.is_file() or _expired(f):
         raise EditError("Version not found", 404)
     return f.read_text(encoding="utf-8", errors="replace")
 

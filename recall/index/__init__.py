@@ -12,7 +12,7 @@ Links between notes are stored for backlinks and the note graph.
     schema.py   SQLite schema
 """
 
-from .core import SKIP_DIRS, Index
+from .core import SKIP_DIRS, Index, prune_other_indexes
 from .query import HL_END, HL_START, TYPE_GROUPS, Filters, build_match_query
 
-__all__ = ["Index", "Filters", "TYPE_GROUPS", "SKIP_DIRS", "HL_START", "HL_END", "build_match_query"]
+__all__ = ["Index", "Filters", "TYPE_GROUPS", "SKIP_DIRS", "HL_START", "HL_END", "build_match_query", "prune_other_indexes"]

@@ -110,7 +110,7 @@ export async function loadVersions() {
   if (!path) return;
   try {
     const { versions } = await api("/api/versions?path=" + encodeURIComponent(path));
-    sel.innerHTML = `<option value="">History (${versions.length})…</option>` +
+    sel.innerHTML = `<option value="">History, last 4 h (${versions.length})…</option>` +
       versions.map(v => `<option value="${v.id}">${new Date(v.saved_at * 1000).toLocaleString()}</option>`).join("");
   } catch {}
 }

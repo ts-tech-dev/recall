@@ -130,3 +130,19 @@ def test_old_ai_captions_are_dropped(index, notes, data):
     with again._conn() as c:
         assert "caption" not in {r[1] for r in c.execute("PRAGMA table_info(image_meta)")}
     assert again.build()["updated"] >= 1
+
+
+def test_prune_other_indexes_keeps_only_the_current_folder(tmp_path):
+    from recall.index import prune_other_indexes
+
+    data, a, b = tmp_path / "data", tmp_path / "a", tmp_path / "b"
+    a.mkdir(), b.mkdir()
+    old, cur = Index(a, data), Index(b, data)
+    for idx in (old, cur):
+        idx.cache_dir.mkdir(parents=True, exist_ok=True)
+        idx.versions_dir.mkdir(parents=True, exist_ok=True)
+    (data / "indexes" / "not-recall.txt").write_text("x")
+    prune_other_indexes(data, b)
+    left = sorted(p.name for p in (data / "indexes").iterdir())
+    assert not old.db_path.exists() and not old.cache_dir.exists() and not old.versions_dir.exists()
+    assert cur.db_path.exists() and cur.cache_dir.exists() and "not-recall.txt" in left
