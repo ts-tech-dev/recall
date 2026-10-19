@@ -360,10 +360,13 @@ def _safe_name(name: str) -> str:
 
 
 def save_upload(root: Path, note_rel: str, filename: str, data: bytes) -> dict:
-    """Store an image in the `images` folder next to the note (created if needed); return the link to insert."""
+    """Store an image in the `images` folder next to the note (created if needed); return the link to insert.
+
+    Images are named after the note and numbered: pictures pasted into dicom.md become dicom_1.png, dicom_2.png…
+    """
     note = inside(root, note_rel)
-    name = _safe_name(filename or "pasted.png")
-    if Path(name).suffix not in UPLOAD_EXTS:
+    ext = Path(_safe_name(filename or "pasted.png")).suffix
+    if ext not in UPLOAD_EXTS:
         raise EditError("Only image files can be uploaded", 415)
     if len(data) > MAX_UPLOAD_BYTES:
         raise EditError("Image is too large", 413)
@@ -371,14 +374,19 @@ def save_upload(root: Path, note_rel: str, filename: str, data: bytes) -> dict:
     if folder.exists() and not folder.is_dir():
         raise EditError(f"'{IMAGES_DIR}' next to this note is a file, not a folder", 409)
     folder.mkdir(parents=True, exist_ok=True)
-    target = folder / name
-    n = 1
-    while target.exists():
-        if target.read_bytes() == data:
-            break  # same image pasted twice: reuse it
-        target = folder / f"{Path(name).stem}-{n}{Path(name).suffix}"
-        n += 1
+    stem = Path(_safe_name(note.stem + ".x")).stem
+    numbered = re.compile(re.escape(stem) + r"_(\d+)\.[^.]+", re.IGNORECASE)
+    last = 0
+    for f in folder.iterdir():
+        m = numbered.fullmatch(f.name)
+        if not m:
+            continue
+        if f.is_file() and f.stat().st_size == len(data) and f.read_bytes() == data:
+            target = f  # same image pasted twice: reuse it
+            break
+        last = max(last, int(m.group(1)))
     else:
+        target = folder / f"{stem}_{last + 1}{ext}"
         _atomic_write(target, data)
     return {"name": target.name, "path": target.relative_to(root.resolve()).as_posix(),
             "link": f"{IMAGES_DIR}/{target.name}"}

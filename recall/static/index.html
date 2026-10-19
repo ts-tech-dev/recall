@@ -147,6 +147,10 @@
             <label class="check small"><input type="checkbox" id="ed-preview-toggle" checked> Preview</label>
             <button class="btn ghost small" id="ed-image" title="Insert an image (you can also paste or drop one)">Image…</button>
             <input type="file" id="ed-file" accept="image/*" hidden multiple>
+            <div class="table-pick">
+              <button class="btn ghost small" id="ed-table" title="Insert a table (in a table, Tab and Enter move between cells)">Table…</button>
+              <div class="table-picker" id="ed-table-picker" hidden><div class="grid"></div><div class="label muted small"></div></div>
+            </div>
             <button class="btn ghost small" id="ed-cancel">Close</button>
             <button class="btn primary small" id="ed-save" title="Ctrl+S">Save</button>
           </div>

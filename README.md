@@ -78,7 +78,8 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   (```` ```mermaid ````), Obsidian callouts and GitHub alerts (`> [!note] Title`, foldable with `[!tip]-`),
   `==highlights==`, `%%comments%%`, `#tags` (click to search), `:emoji:` shortcodes, definition lists
   (`Term` then `: definition`), image sizes (`![alt|300](pic.png)`, `![[pic.png|300]]`) and heading ids
-  (`## Title {#id}`).
+  (`## Title {#id}`). As in Obsidian, a single Enter starts a new line, and a list item indented further than the
+  one above is nested under it, however far it's indented.
 - **Themes**: pick *Auto* (follows your system), *Light*, *Grey* or *Dark* from the menu in the top bar. The choice is
   remembered by the browser.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to
@@ -103,7 +104,11 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   hide unconnected notes and click to open. Under each note, short lines show *Linked from*, *Links to* and *Similar notes*. The note uses the full width;
   the *Outline* button shows its headings beside it (remembered by the browser).
 - **Editing**: edit Markdown and text notes with a live preview. Paste, drop or pick images and they are saved in an
-  `images` folder next to the note (created if it doesn't exist yet) and linked as `images/<name>`. Ctrl+S saves. If the file changed on disk since you opened it, you're
+  `images` folder next to the note (created if it doesn't exist yet), named after the note (`dicom_1.png`,
+  `dicom_2.png`…) and linked as `images/dicom_1.png` at no more than 600px wide; drag an image's bottom-right corner
+  in the preview to resize it. In a list, Enter starts the next item (Enter on an empty one ends the list) and
+  Tab / Shift+Tab indent and outdent. *Table…* inserts a table of the size you pick; in a table, Tab and Enter
+  move between cells and keep the columns lined up. Cells copied from a spreadsheet paste as a table. Ctrl+S saves. If the file changed on disk since you opened it, you're
   asked before anything is overwritten. Versions saved in the last 4 hours are kept, up to 30 per note (*History…*); older ones are deleted. *+ Note*
   creates a new note: pick the folder from a list, or make a new one. The **+** next to a folder in the file
   list creates the note in that folder.

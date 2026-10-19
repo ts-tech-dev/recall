@@ -1,9 +1,11 @@
-// Markdown rendering: marked (GitHub-flavored, plus the extensions in md/extensions.js, footnotes and KaTeX math),
-// sanitized with DOMPurify, then enhanced in the page (md/enhance.js) and given working task checkboxes (tasks.js).
+// Markdown rendering: marked (GitHub-flavored, a single Enter is a line break as in Obsidian, plus the extensions
+// in md/extensions.js, footnotes and KaTeX math), sanitized with DOMPurify, then enhanced in the page
+// (md/enhance.js) and given working task checkboxes (tasks.js).
 
 import { $$ } from "./util.js";
 import { state } from "./state.js";
 import { emojiExtension, extensions } from "./md/extensions.js";
+import { normalizeLists } from "./md/lists.js";
 import { callouts, codeBlocks, headingIds, imageSizes, links, tags } from "./md/enhance.js";
 import { enableTasks } from "./tasks.js";
 
@@ -27,7 +29,7 @@ function withinParagraph(options) {
 }
 
 function makeParser(footnotes) {
-  const m = new marked.Marked({ gfm: true, breaks: false });
+  const m = new marked.Marked({ gfm: true, breaks: true });
   m.use(withinParagraph({ extensions: [...extensions, emojiExtension(emoji)] }));
   if (window.markedKatex) m.use(withinParagraph(markedKatex({ throwOnError: false, output: "htmlAndMathml" })));
   if (footnotes && window.markedFootnote) m.use(withinParagraph(markedFootnote({ description: "Footnotes" })));
@@ -35,7 +37,7 @@ function makeParser(footnotes) {
 }
 // The footnote extension slows every parse (~2 s on a 750 KB note), so it's only used when a note has "[^".
 const parser = makeParser(false), footnoteParser = makeParser(true);
-const parse = md => (md.includes("[^") ? footnoteParser : parser).parse(md);
+const parse = md => (md.includes("[^") ? footnoteParser : parser).parse(normalizeLists(md));
 
 /** Mark the checkboxes of task list items and bare "[ ]" lines (in document order). */
 function markTasks(el) {

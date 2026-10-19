@@ -14,3 +14,14 @@
 }
 #ed-text.dragging { outline: 2px dashed var(--accent); }
 #ed-preview { overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 22px; }
+#ed-preview img.resizable:hover { outline: 2px solid var(--accent-soft); }
+#ed-preview img.resizable.corner { cursor: nwse-resize; outline-color: var(--accent); }
+.table-pick { position: relative; }
+.table-picker {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; padding: 8px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.table-picker .grid { display: grid; grid-template-columns: repeat(8, 16px); gap: 3px; cursor: pointer; }
+.table-picker .grid span { width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 3px; }
+.table-picker .grid span.on { background: var(--accent-soft); border-color: var(--accent); }
+.table-picker .label { margin-top: 6px; text-align: center; white-space: nowrap; }

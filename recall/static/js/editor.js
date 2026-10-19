@@ -2,6 +2,8 @@
 
 import { $, H, api, toast } from "./util.js";
 import { state } from "./state.js";
+import { editorKey, insertTable, pasteBlock, replaceRange, setText, tableFromClipboard } from "./edtext.js";
+import { enableImageResize } from "./imgresize.js";
 import { renderMarkdown } from "./markdown.js";
 import { setTask } from "./tasks.js";
 import { openDoc, showView } from "./viewer.js";
@@ -48,10 +50,7 @@ export function schedulePreview() {
 function toggleTaskInEditor(index, checked, count) {
   const ta = $("#ed-text"), next = setTask(ta.value, index, checked, count);
   if (next === null) { toast("Couldn't match this checkbox to a line in the text."); return false; }
-  const { selectionStart: a, selectionEnd: b } = ta;
-  ta.value = next;
-  ta.setSelectionRange(a, b);
-  setEditorState();
+  setText(ta, next);
   return true;
 }
 
@@ -65,7 +64,9 @@ export async function renderEditorPreview() {
   }
   try {
     const r = await api("/api/render", { method: "POST", headers: H, body: JSON.stringify({ path, markdown: md }) });
-    if (state.editing?.path === path) renderMarkdown($("#ed-preview"), r.markdown, { onTask: toggleTaskInEditor });
+    if (state.editing?.path !== path) return;
+    renderMarkdown($("#ed-preview"), r.markdown, { onTask: toggleTaskInEditor });
+    enableImageResize($("#ed-preview"), () => $("#ed-text").value, text => setText($("#ed-text"), text));
   } catch {}
 }
 
@@ -115,6 +116,18 @@ export async function loadVersions() {
   } catch {}
 }
 
+const DEFAULT_IMAGE_WIDTH = 600;  // px; pasted images start no wider than this (drag in the preview to resize)
+
+/** The width a new image starts at: its size on screen (a screenshot on a HiDPI display is 2× its pixels), capped. */
+async function startWidth(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const w = Math.round(bmp.width / (window.devicePixelRatio || 1));
+    bmp.close();
+    return Math.min(w, DEFAULT_IMAGE_WIDTH);
+  } catch { return DEFAULT_IMAGE_WIDTH; }  // svg and other formats the browser can't measure this way
+}
+
 export async function uploadImages(files) {
   const ed = state.editing;
   if (!ed) return;
@@ -124,34 +137,55 @@ export async function uploadImages(files) {
     const fd = new FormData();
     fd.append("note", ed.path);
     const ext = (f.type.split("/")[1] || "png").replace("jpeg", "jpg").replace("svg+xml", "svg");
-    fd.append("file", f, f.name && f.name !== "image.png" ? f.name : `pasted-${Date.now()}.${ext}`);
+    fd.append("file", f, f.name || `pasted.${ext}`);  // the server names it after the note: note_1.png…
     try {
       const r = await fetch("/api/upload", { method: "POST", headers: { "X-Recall": "1" }, body: fd });
       const body = await r.json();
       if (!r.ok) throw new Error(body.detail || r.statusText);
       const alt = body.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
-      insertAtCursor(ta, `![${alt}](${encodeURI(body.link)})\n`);
+      insertAtCursor(ta, `![${alt}|${await startWidth(f)}](${encodeURI(body.link)})\n`);
     } catch (e) { toast("Upload failed: " + e.message); }
   }
 }
 
 export function insertAtCursor(ta, text) {
-  ta.focus();
   const { selectionStart: a, selectionEnd: b, value } = ta;
   const pre = a > 0 && value[a - 1] !== "\n" ? "\n" : "";
-  ta.setRangeText(pre + text, a, b, "end");
-  ta.dispatchEvent(new Event("input"));
+  replaceRange(ta, a, b, pre + text);
+}
+
+/** The Table button: a grid to pick the size of a new table. */
+function bindTablePicker() {
+  const COLS = 8, ROWS = 8;
+  const picker = $("#ed-table-picker"), grid = $(".grid", picker), label = $(".label", picker);
+  grid.innerHTML = Array.from({ length: COLS * ROWS }, (_, i) =>
+    `<span data-c="${i % COLS + 1}" data-r="${Math.floor(i / COLS) + 1}"></span>`).join("");
+  const show = (c, r) => {
+    for (const cell of grid.children) cell.classList.toggle("on", +cell.dataset.c <= c && +cell.dataset.r <= r);
+    label.textContent = `${c} column${c > 1 ? "s" : ""} × ${r} row${r > 1 ? "s" : ""}`;
+  };
+  const close = () => { picker.hidden = true; };
+  $("#ed-table").onclick = e => { e.stopPropagation(); picker.hidden = !picker.hidden; show(3, 2); };
+  grid.onmouseover = e => { const d = e.target.dataset; if (d.c) show(+d.c, +d.r); };
+  grid.onclick = e => {
+    const d = e.target.dataset;
+    if (!d.c) return;
+    close();
+    insertTable($("#ed-text"), +d.c, +d.r);
+  };
+  document.addEventListener("click", e => { if (!picker.hidden && !picker.contains(e.target)) close(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
 }
 
 export function bindEditor() {
   const ta = $("#ed-text");
   ta.addEventListener("input", () => { setEditorState(); schedulePreview(); });
-  ta.addEventListener("keydown", e => {
-    if (e.key === "Tab" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); ta.setRangeText("  ", ta.selectionStart, ta.selectionEnd, "end"); ta.dispatchEvent(new Event("input")); }
-  });
+  ta.addEventListener("keydown", e => { if (editorKey(ta, e)) e.preventDefault(); });
   ta.addEventListener("paste", e => {
     const files = [...(e.clipboardData?.files || [])];
-    if (files.length) { e.preventDefault(); uploadImages(files); }
+    if (files.length) { e.preventDefault(); uploadImages(files); return; }
+    const table = e.clipboardData && tableFromClipboard(e.clipboardData);
+    if (table) { e.preventDefault(); pasteBlock(ta, table); }
   });
   ta.addEventListener("dragover", e => { e.preventDefault(); ta.classList.add("dragging"); });
   ta.addEventListener("dragleave", () => ta.classList.remove("dragging"));
@@ -161,6 +195,7 @@ export function bindEditor() {
     if (files.length) { e.preventDefault(); uploadImages(files); }
   });
   $("#ed-image").onclick = () => $("#ed-file").click();
+  bindTablePicker();
   $("#ed-file").onchange = e => { uploadImages([...e.target.files]); e.target.value = ""; };
   $("#ed-save").onclick = () => saveEditor();
   $("#ed-overwrite").onclick = () => saveEditor(true);
