@@ -309,8 +309,8 @@ def _notes(root: Path):
 def _move_images(root: Path, src: Path, dest_dir: Path, text: str) -> dict[Path, Path]:
     """Bring along the images a note shows from its own folder or the `images` folder next to it.
 
-    They keep their place relative to the note. An image another note also shows is copied instead, so that
-    note keeps working. Returns {old path: new path}.
+    They go to the `images` folder next to the note's new place (keeping any sub-folder inside `images`). An image
+    another note also shows is copied instead, so that note keeps working. Returns {old path: new path}.
     """
     own = {p for p in _image_targets(text, src.parent)
            if p.parent == src.parent or p.is_relative_to(src.parent / IMAGES_DIR)}
@@ -329,7 +329,8 @@ def _move_images(root: Path, src: Path, dest_dir: Path, text: str) -> dict[Path,
             shared |= own & _image_targets(other, d)
     moved = {}
     for img in sorted(own):
-        target = dest_dir / img.relative_to(src.parent)
+        rel = img.relative_to(src.parent)
+        target = dest_dir / (rel if rel.parts[0] == IMAGES_DIR else Path(IMAGES_DIR) / rel)
         n = 1
         while target.exists() and target.read_bytes() != img.read_bytes():
             target = target.with_name(f"{img.stem}-{n}{img.suffix}")
@@ -381,7 +382,7 @@ def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
         if fixed != text:
             _atomic_write(dest, fixed.encode("utf-8"))
 
-    updated = _relink(root, src, dest, skip=dest)
+    updated = _relink(root, {src: dest}, skip=dest)
     _move_versions(root, versions_root, src, new_rel)
     return {"path": new_rel, "updated": updated,
             "images": sorted(p.relative_to(root).as_posix() for p in images.values())}
@@ -394,14 +395,15 @@ def _move_versions(root: Path, versions_root: Path, src: Path, new_rel: str) -> 
         (new_vd / "path.txt").write_text(new_rel)
 
 
-def _relink(root: Path, src: Path, dest: Path, skip: Path | None = None, names: Context | None = None) -> list[str]:
-    """Point the links in every Markdown note (but `skip`) that led to `src` at `dest`, which it has become.
+def _relink(root: Path, moved: dict[Path, Path], skip: Path | None = None, names: Context | None = None) -> list[str]:
+    """Point the links in every Markdown note (but `skip`) that led to a key of `moved` at its value.
 
-    Relative links are rewritten. With `names` (a lookup made before the file changed name), so are wiki links
-    ([[name]], ![[name]]) that found it by its old name. Returns the notes that changed.
+    Relative links are rewritten. With `names` (a lookup made before the files changed name), so are wiki links
+    ([[name]], ![[name]]) that found them by their old names. Returns the notes that changed.
     """
     updated = []
-    needles = {n.lower() for n in {src.name, quote(src.name)} | ({src.stem} if names else set())}
+    renamed = {dest: src for src, dest in moved.items()}
+    needles = {n.lower() for src in moved for n in {src.name, quote(src.name)} | ({src.stem} if names else set())}
     for d, p in _notes(root):
         if p == skip:
             continue
@@ -411,25 +413,27 @@ def _relink(root: Path, src: Path, dest: Path, skip: Path | None = None, names: 
             continue
         if not any(n in text.lower() for n in needles):
             continue
-        fixed = _retarget(text, root, d, d, {src: dest})
+        fixed = _retarget(text, root, d, d, moved)
         if names:
-            fixed = _rename_wiki_links(fixed, names, p if p != dest else src, root, src, dest)
+            fixed = _rename_wiki_links(fixed, names, renamed.get(p, p), root, moved)
         if fixed != text:
             _atomic_write(p, fixed.encode("utf-8"))
             updated.append(p.relative_to(root).as_posix())
     return sorted(updated)
 
 
-def _rename_wiki_links(md: str, names: Context, note: Path, root: Path, src: Path, dest: Path) -> str:
-    """Rename the wiki links in `md` (a note at `note`) that found `src` by name, keeping any folder, #heading or |alias."""
-    old_rel = src.relative_to(root).as_posix()
+def _rename_wiki_links(md: str, names: Context, note: Path, root: Path, moved: dict[Path, Path]) -> str:
+    """Rename the wiki links in `md` (a note at `note`) that found a key of `moved` by name, keeping any folder,
+    #heading or |alias."""
+    by_rel = {src.relative_to(root).as_posix(): (src, dest) for src, dest in moved.items()}
 
     def fix(m: re.Match, embed: bool) -> str:
         target = m.group(1).strip()
         found = (resolve_local(names, note, target) or names.find_by_name(target)) if embed \
             else (names.find_by_name(target) or names.find_by_name(target + ".md"))
-        if found != old_rel:
+        if found not in by_rel:
             return m.group(0)
+        src, dest = by_rel[found]
         head, _, last = target.rpartition("/")
         new = dest.name if last.lower() == src.name.lower() else dest.stem
         a, b = m.span(1)
@@ -467,7 +471,9 @@ def rename_file(root: Path, versions_root: Path, rel: str, name: str) -> dict:
         raise EditError(f"{new_rel} already exists", 409)
     names = Context(root=root, cache_dir=root)
     names.find_by_name(src.name)  # look up every name now, before the file has its new one
+    pasted = _pasted_images(src, names) if src.suffix.lower() in MARKDOWN_EXTS else []
     os.replace(src, dest)
+    images = _rename_pasted_images(pasted, src, dest)
 
     retitled = False
     if dest.suffix.lower() in MARKDOWN_EXTS:
@@ -479,9 +485,48 @@ def rename_file(root: Path, versions_root: Path, rel: str, name: str) -> dict:
             _atomic_write(dest, text.encode("utf-8"))
             retitled = True
 
-    updated = [u for u in _relink(root, src, dest, names=names) if u != new_rel]
+    updated = [u for u in _relink(root, {src: dest, **images}, names=names) if u != new_rel]
     _move_versions(root, versions_root, src, new_rel)
-    return {"path": new_rel, "updated": updated, "retitled": retitled}
+    return {"path": new_rel, "updated": updated, "retitled": retitled,
+            "images": sorted(p.relative_to(root).as_posix() for p in images.values())}
+
+
+def _upload_stem(note: Path) -> str:
+    """The start of the names `save_upload` gives images pasted into `note` ("my note.md" -> "my-note")."""
+    return Path(_safe_name(note.stem + ".x")).stem
+
+
+def _pasted_images(note: Path, names: Context) -> list[Path]:
+    """The images pasted into `note` that it still shows: <note name>_<n> in the `images` folder next to it."""
+    text = note.read_text(encoding="utf-8", errors="replace")
+    shown = _image_targets(text, note.parent)
+    root = names.root.resolve()
+    for is_code, seg in split_code(text):
+        if not is_code:
+            for m in WIKI_EMBED_RE.finditer(seg):
+                found = resolve_local(names, note, m.group(1).strip()) or names.find_by_name(m.group(1).strip())
+                if found:
+                    shown.add(root / found)
+    numbered = re.compile(re.escape(_upload_stem(note)) + r"_\d+\.[^.]+", re.IGNORECASE)
+    return sorted(p for p in shown if p.parent == note.parent / IMAGES_DIR and numbered.fullmatch(p.name) and p.is_file())
+
+
+def _rename_pasted_images(images: list[Path], src: Path, dest: Path) -> dict[Path, Path]:
+    """Give pasted images the renamed note's name, keeping their numbers where free. Returns {old: new}."""
+    old_stem, new_stem = _upload_stem(src), _upload_stem(dest)
+    if old_stem == new_stem:
+        return {}
+    renamed = {}
+    for img in images:
+        folder, n = img.parent, int(img.stem.rsplit("_", 1)[1])
+        target = folder / f"{new_stem}_{n}{img.suffix}"
+        if target.exists():  # numbered after the highest image of that name instead
+            taken = [int(m.group(1)) for f in folder.iterdir()
+                     if (m := re.fullmatch(re.escape(new_stem) + r"_(\d+)\.[^.]+", f.name, re.IGNORECASE))]
+            target = folder / f"{new_stem}_{max(taken) + 1}{img.suffix}"
+        os.replace(img, target)
+        renamed[img] = target
+    return renamed
 
 
 def _safe_name(name: str) -> str:

@@ -139,8 +139,9 @@ export function renameCurrentDoc() {
     if (state.scopePath === path) setScope(r.path);
     await loadTree();
     openDoc(r.path, "", { force: true });
-    const n = r.updated.length;
-    toast(`Renamed to ${r.path.split("/").pop()}` + (n ? ` · updated links in ${n} note${n > 1 ? "s" : ""}` : ""), 3500);
+    const n = r.updated.length, i = r.images.length;
+    toast(`Renamed to ${r.path.split("/").pop()}` + (i ? ` with ${i} image${i > 1 ? "s" : ""}` : "") +
+      (n ? ` · updated links in ${n} note${n > 1 ? "s" : ""}` : ""), 3500);
   };
   dlg.showModal();
   input.select();

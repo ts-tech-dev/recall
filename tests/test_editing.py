@@ -248,11 +248,12 @@ def test_move_note_takes_its_images_along(notes, tmp_path):
     (notes / "trips" / "rome.md").write_text(
         "# Rome\n\n![map](images/map.png)\n\n<img src=\"beach.jpg\">\n\n![d](../images/vlan-diagram.png)\n")
     r = editing.move_file(notes, tmp_path / "v", "trips/rome.md", "archive/2025")
-    assert r["images"] == ["archive/2025/beach.jpg", "archive/2025/images/map.png"]
-    assert (notes / "archive/2025/images/map.png").is_file() and (notes / "archive/2025/beach.jpg").is_file()
+    assert r["images"] == ["archive/2025/images/beach.jpg", "archive/2025/images/map.png"]
+    assert (notes / "archive/2025/images/map.png").is_file() and (notes / "archive/2025/images/beach.jpg").is_file()
     assert not (notes / "trips/images").exists() and not (notes / "trips/beach.jpg").exists()  # emptied folder removed
     text = (notes / "archive/2025/rome.md").read_text()
-    assert "![map](images/map.png)" in text and '<img src="beach.jpg">' in text  # same place next to the note
+    # all of them end up in the images folder next to the note
+    assert "![map](images/map.png)" in text and '<img src="images/beach.jpg">' in text
     assert "![d](../../images/vlan-diagram.png)" in text  # images from elsewhere stay put, link updated
     assert (notes / "images/vlan-diagram.png").is_file()
 
@@ -309,7 +310,7 @@ def test_rename_note_updates_links_and_title(notes, tmp_path):
     (notes / "untouched.md").write_text("# Untouched\n\n[[plan-ab]] and plan-a in text\n")
     before = (notes / "untouched.md").stat().st_mtime_ns
     r = editing.rename_file(notes, tmp_path / "v", "plan-a.md", "Plan B")
-    assert r == {"path": "Plan B.md", "updated": ["networking/uses.md"], "retitled": True}
+    assert r == {"path": "Plan B.md", "updated": ["networking/uses.md"], "retitled": True, "images": []}
     assert not (notes / "plan-a.md").exists()
     assert (notes / "Plan B.md").read_text() == "# Plan B\n\nSee [[Plan B#Goals|the goals]] and [self](Plan%20B.md).\n"
     assert (notes / "networking/uses.md").read_text() == (
@@ -349,3 +350,29 @@ def test_api_rename(api, notes):
     r = api.post("/api/rename", json={"path": "backups.md", "name": "restic"}, headers=H)
     assert r.status_code == 200 and r.json()["path"] == "restic.md"
     assert api.post("/api/rename", json={"path": "backups.md", "name": "x"}, headers=H).status_code == 404
+
+
+def test_rename_note_renames_its_pasted_images(notes, tmp_path):
+    (notes / "trips" / "images").mkdir(parents=True)
+    for name in ("rome-trip_1.png", "rome-trip_2.png", "rome-trip_3.png", "sunset.png"):
+        (notes / "trips" / "images" / name).write_bytes(make_png())
+    (notes / "trips" / "images" / "italy_2.png").write_bytes(make_png(rgb=(1, 2, 3)))  # taken: _2 can't be used
+    (notes / "trips" / "rome trip.md").write_text(
+        "# Rome\n\n![a](images/rome-trip_1.png) ![b](images/rome-trip_2.png) ![[rome-trip_3.png|200]] "
+        "![s](images/sunset.png)\n")
+    (notes / "trips" / "other.md").write_text("Shared: ![a](images/rome-trip_1.png)\n")
+    r = editing.rename_file(notes, tmp_path / "v", "trips/rome trip.md", "italy")
+    assert r["images"] == ["trips/images/italy_1.png", "trips/images/italy_3.png", "trips/images/italy_4.png"]
+    assert r["updated"] == ["trips/other.md"]
+    assert (notes / "trips/italy.md").read_text() == (
+        "# Rome\n\n![a](images/italy_1.png) ![b](images/italy_3.png) ![[italy_4.png|200]] ![s](images/sunset.png)\n")
+    assert (notes / "trips/other.md").read_text() == "Shared: ![a](images/italy_1.png)\n"
+    assert (notes / "trips/images/sunset.png").is_file()  # a name you chose yourself stays
+    assert not list((notes / "trips/images").glob("rome-trip_*"))
+
+
+def test_rename_leaves_pasted_images_the_note_no_longer_shows(notes, tmp_path):
+    (notes / "images" / "notes_1.png").write_bytes(make_png())
+    (notes / "notes.md").write_text("# notes\n\nNo pictures any more.\n")
+    r = editing.rename_file(notes, tmp_path / "v", "notes.md", "journal")
+    assert r["images"] == [] and (notes / "images/notes_1.png").is_file()
