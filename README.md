@@ -80,6 +80,10 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   (`Term` then `: definition`), image sizes (`![alt|300](pic.png)`, `![[pic.png|300]]`) and heading ids
   (`## Title {#id}`). As in Obsidian, a single Enter starts a new line, and a list item indented further than the
   one above is nested under it, however far it's indented.
+- **Export PDF**: the *Export PDF* button on a note (Markdown, or a converted Word/PowerPoint/Excel/HTML file) lays
+  it out for paper, always in light colors, with its images, tables, math, code and diagrams, page numbers, and
+  folded callouts opened. Your browser's print dialog then opens: choose *Save as PDF* as the printer. Turn off the
+  browser's *Headers and footers* option for a cleaner page. Web links stay clickable in the PDF.
 - **Themes**: pick *Auto* (follows your system), *Light*, *Grey* or *Dark* from the menu in the top bar. The choice is
   remembered by the browser.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to

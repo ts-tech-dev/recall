@@ -1,0 +1,62 @@
+/* A note laid out for paper, used by "Export PDF" (js/export.js) on top of markdown.css. Always light. */
+
+:root {
+  --bg: #fff;
+  --panel: #fff;
+  --text: #1d2330;
+  --muted: #5d6676;
+  --border: #d9dde4;
+  --accent: #2459c4;
+  --accent-soft: #e8f0fd;
+  --mark: #fff1a8;
+  --danger: #c62f2f;
+  --code-bg: #f3f5f8;
+  color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;  /* keep code, table header, callout and highlight backgrounds */
+}
+
+@page {
+  size: auto;
+  margin: 18mm 17mm 20mm;
+  @bottom-right { content: counter(page) " / " counter(pages); font: 9pt system-ui, sans-serif; color: #8a93a3; }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--text); }
+body { font: 10.5pt/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+.paper-head { margin-bottom: 16pt; }
+.paper-head h1 { font-size: 22pt; line-height: 1.2; margin: 0 0 6pt; padding-bottom: 6pt; border-bottom: 2px solid var(--accent); }
+.paper-tags { display: flex; flex-wrap: wrap; gap: 4pt; }
+.tag { font-size: 8.5pt; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1pt 7pt; }
+
+/* headings */
+.md h1 { font-size: 20pt; padding-bottom: 4pt; border-bottom: 1px solid var(--border); }
+.md h2 { font-size: 15pt; padding-bottom: 3pt; border-bottom: 1px solid var(--border); }
+.md h3 { font-size: 12.5pt; }
+.md h4 { font-size: 11pt; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { break-after: avoid; page-break-after: avoid; }
+.md p, .md li { orphans: 3; widows: 3; }
+
+/* nothing scrolls on paper: wrap code, show whole tables, math and diagrams */
+.md pre { white-space: pre-wrap; overflow: visible; border: 1px solid var(--border); font-size: 9pt; line-height: 1.45; }
+.md code { font-family: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace; }
+.md table { display: table; overflow: visible; max-width: 100%; font-size: 9.5pt; }
+.md tr, .md img, .md .mermaid, .md .math-block, .md .katex-display, .md .callout-title { break-inside: avoid; page-break-inside: avoid; }
+.md pre, .md blockquote, .md .callout { break-inside: avoid-page; }
+.md thead { display: table-header-group; }  /* a table that runs onto the next page repeats its header */
+.md .katex-display, .md .math-block, .md .mermaid { overflow: visible; }
+.md .mermaid svg { max-width: 100%; height: auto; }
+
+/* images: centered, never wider than the text or taller than a page */
+.md img { cursor: auto; border: 0; margin: 10pt auto; max-height: 230mm; object-fit: contain; }
+.md img.sized { display: inline-block; margin: 4pt 0; }
+
+/* links stay clickable in the PDF; plain text for links to other notes and #tags */
+.md a { color: var(--accent); text-decoration: none; }
+.md span.tag { font-size: .9em; padding: 0 6px; }
+.md summary { cursor: auto; list-style: none; }  /* folded sections are printed open, so no ▸ */
+.md summary::-webkit-details-marker { display: none; }
+.md .footnotes h2 { border-bottom: 0; padding-bottom: 0; }
+.md a[data-footnote-backref] { display: none; }  /* "↩" jumps back to the text: no use on paper */

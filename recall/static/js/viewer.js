@@ -9,6 +9,7 @@ import { moveCurrentDoc } from "./files.js";
 import { setScope } from "./ask.js";
 import { setTask } from "./tasks.js";
 import { sideSearch } from "./tree.js";
+import { exportPdf } from "./export.js";
 
 export function showView(name) {
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
@@ -53,6 +54,7 @@ export function renderDoc(d) {
   const c = $("#doc-content"), toggle = $("#doc-pdf-toggle");
   toggle.hidden = d.kind !== "pdf";
   $("#doc-edit").hidden = !d.editable;
+  $("#doc-pdf").hidden = d.kind !== "markdown";
   loadRelated(d.path);
   c.className = "md";
   if (d.kind === "image") {
@@ -152,6 +154,7 @@ export function bindViewer() {
   $$(".tab").forEach(t => (t.onclick = () => showView(t.dataset.view)));
   $("#doc-edit").onclick = () => state.currentDoc && openEditor(state.currentDoc);
   $("#doc-move").onclick = moveCurrentDoc;
+  $("#doc-pdf").onclick = () => state.currentDoc && exportPdf(state.currentDoc);
   $("#doc-ask").onclick = () => {
     setScope(state.currentDoc);
     showView("ask");

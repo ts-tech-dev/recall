@@ -50,7 +50,8 @@ def test_ui_served(client):
             base = url.rsplit("/", 1)[0]
             for imp in re.findall(r'^import .* from "(\.{1,2}/[^"]+)";', res.text, re.M):
                 pending.append(posixpath.normpath(f"{base}/{imp}"))
-    assert "/static/js/main.js" in seen and "/static/js/md/enhance.js" in seen
+    assert "/static/js/main.js" in seen and "/static/js/md/enhance.js" in seen and "/static/js/export.js" in seen
+    assert client.get("/static/css/print.css").status_code == 200  # loaded by the PDF export's page
 
 
 def test_status_without_notes(client):

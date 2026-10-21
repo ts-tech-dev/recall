@@ -57,8 +57,9 @@ function markTasks(el) {
  * Render Markdown safely into `el`.
  * `answer`: an Ask result (only images served by this app, [n] citations become links).
  * `onTask(index, checked, count)`: make task checkboxes clickable; it saves and returns true, or false to undo.
+ * `light`: draw diagrams in the light theme (for PDF export). Resolves once diagrams are drawn.
  */
-export function renderMarkdown(el, md, { answer = false, onTask = null } = {}) {
+export function renderMarkdown(el, md, { answer = false, onTask = null, light = false } = {}) {
   el.innerHTML = DOMPurify.sanitize(parse(md), { ADD_ATTR: ["target"] });
   if (answer) {
     $$("img", el).forEach(img => { if (!(img.getAttribute("src") || "").startsWith("/api/")) img.remove(); });
@@ -68,10 +69,11 @@ export function renderMarkdown(el, md, { answer = false, onTask = null } = {}) {
   callouts(el);
   markTasks(el);
   imageSizes(el);
-  codeBlocks(el);
+  const drawn = codeBlocks(el, { light });
   tags(el);
   links(el);
   if (onTask) enableTasks(el, onTask);
+  return drawn;
 }
 
 /** Turn [3] / [2][4] in answer text into clickable source chips (skips code). */

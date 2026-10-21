@@ -96,8 +96,9 @@ export function imageSizes(el) {
   }
 }
 
-/** Syntax highlighting, ```math blocks (KaTeX) and ```mermaid diagrams. */
-export function codeBlocks(el) {
+/** Syntax highlighting, ```math blocks (KaTeX) and ```mermaid diagrams. Resolves once the diagrams are drawn;
+ * `light` draws them in the light theme whatever the page's theme (for PDF export). */
+export function codeBlocks(el, { light = false } = {}) {
   const diagrams = [];
   for (const code of $$("pre > code", el)) {
     const lang = (/language-(\S+)/.exec(code.className) || [])[1];
@@ -116,7 +117,7 @@ export function codeBlocks(el) {
       try { hljs.highlightElement(code); } catch {}
     }
   }
-  if (diagrams.length) renderDiagrams(diagrams);
+  return diagrams.length ? renderDiagrams(diagrams, light) : Promise.resolve();
 }
 
 let mermaidReady = null;
@@ -125,7 +126,6 @@ function loadMermaid() {
     const s = document.createElement("script");
     s.src = "/static/vendor/mermaid.min.js";  // large, so only loaded when a note has a diagram
     s.onload = () => {
-      mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: isDark() ? "dark" : "default" });
       resolve(window.mermaid);
     };
     s.onerror = reject;
@@ -134,9 +134,10 @@ function loadMermaid() {
   return mermaidReady;
 }
 
-async function renderDiagrams(nodes) {
+async function renderDiagrams(nodes, light) {
   try {
     const m = await loadMermaid();
+    m.initialize({ startOnLoad: false, securityLevel: "strict", theme: isDark() && !light ? "dark" : "default" });
     await m.run({ nodes: nodes.filter(n => n.isConnected), suppressErrors: true });
   } catch (e) {
     nodes.forEach(n => n.classList.add("mermaid-error"));
