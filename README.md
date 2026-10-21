@@ -136,6 +136,9 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   it and keep the same place beside the note (an image another note also uses is copied instead, and a folder left
   empty is removed). Other relative links inside the note are updated, and so are relative links to it from other
   notes. `[[Wiki links]]` and `![[embeds]]` find files by name, so they keep working.
+- **Renaming files**: *Rename…* on the open note gives it a new name in the same folder (the extension stays).
+  Relative links to it and `[[wiki links]]` / `![[embeds]]` that find it by name are updated in every note, keeping
+  any `#heading` or `|alias`. If the note's title heading is still its old file name (as new notes start), it is renamed too.
 - **Incremental indexing**: only new or changed files are re-read, OCR'd and embedded, and when a note changes
   only the passages that changed are embedded again. Unreadable files are listed in the status bar.
 - **Fast with big files**: text is indexed first, so new notes are searchable within seconds; the text in images is

@@ -299,3 +299,53 @@ def test_saved_answer_gets_relative_links_and_its_images(api, notes):
     # and the previewer resolves them again
     d = api.get("/api/doc", params={"path": "answers/q.md"}).json()
     assert "(#doc=networking/router.md)" in d["markdown"] and "/api/file?path=answers/images/q_1.png" in d["markdown"]
+
+
+def test_rename_note_updates_links_and_title(notes, tmp_path):
+    (notes / "plan-a.md").write_text("# plan a\n\nSee [[plan-a#Goals|the goals]] and [self](plan-a.md).\n")
+    (notes / "networking" / "uses.md").write_text(
+        "# Uses\n\n[[Plan-A]], [[plan-a.md]], ![[plan-a]], [[backups]], [rel](../plan-a.md), "
+        "[[networking/router]]\n\n```\n[[plan-a]]\n```\n")
+    (notes / "untouched.md").write_text("# Untouched\n\n[[plan-ab]] and plan-a in text\n")
+    before = (notes / "untouched.md").stat().st_mtime_ns
+    r = editing.rename_file(notes, tmp_path / "v", "plan-a.md", "Plan B")
+    assert r == {"path": "Plan B.md", "updated": ["networking/uses.md"], "retitled": True}
+    assert not (notes / "plan-a.md").exists()
+    assert (notes / "Plan B.md").read_text() == "# Plan B\n\nSee [[Plan B#Goals|the goals]] and [self](Plan%20B.md).\n"
+    assert (notes / "networking/uses.md").read_text() == (
+        "# Uses\n\n[[Plan B]], [[Plan B.md]], ![[Plan B]], [[backups]], [rel](../Plan%20B.md), "
+        "[[networking/router]]\n\n```\n[[plan-a]]\n```\n")
+    assert (notes / "untouched.md").stat().st_mtime_ns == before
+
+
+def test_rename_keeps_extension_folder_and_custom_title(notes, tmp_path):
+    (notes / "networking" / "old.md").write_text("# A real title\n")
+    r = editing.rename_file(notes, tmp_path / "v", "networking/old.md", "new.md")
+    assert r["path"] == "networking/new.md" and not r["retitled"]
+    assert (notes / "networking/new.md").read_text() == "# A real title\n"
+    r = editing.rename_file(notes, tmp_path / "v", "networking/new.md", "v1.2 notes")
+    assert r["path"] == "networking/v1.2 notes.md"
+
+
+def test_rename_carries_version_history(notes, tmp_path):
+    src = editing.read_source(notes, "backups.md")
+    editing.save_source(notes, tmp_path / "v", "backups.md", "# Backups\n\nchanged\n", src["mtime_ns"])
+    editing.rename_file(notes, tmp_path / "v", "backups.md", "restic")
+    assert len(editing.list_versions(tmp_path / "v", "restic.md")) == 1
+
+
+@pytest.mark.parametrize("rel,name,status", [
+    ("backups.md", "networking/x", 400), ("backups.md", "backups", 400), ("backups.md", "todo.txt", 400),
+    ("backups.md", ".hidden", 400), ("nope.md", "x", 404),
+])
+def test_rename_refusals(notes, tmp_path, rel, name, status):
+    (notes / "todo.txt.md").write_text("clash")  # "todo.txt" + the kept .md extension
+    with pytest.raises(EditError) as e:
+        editing.rename_file(notes, tmp_path / "v", rel, name)
+    assert e.value.status == (409 if name == "todo.txt" else status)
+
+
+def test_api_rename(api, notes):
+    r = api.post("/api/rename", json={"path": "backups.md", "name": "restic"}, headers=H)
+    assert r.status_code == 200 and r.json()["path"] == "restic.md"
+    assert api.post("/api/rename", json={"path": "backups.md", "name": "x"}, headers=H).status_code == 404

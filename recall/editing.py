@@ -12,7 +12,8 @@ from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from .extractors import EXTERNAL_RE, HTML_IMG_RE, IMAGE_EXTS, MD_IMAGE_RE, MD_LINK_RE, split_code
+from .extractors import EXTERNAL_RE, HTML_IMG_RE, IMAGE_EXTS, MD_IMAGE_RE, MD_LINK_RE, Context, split_code
+from .extractors.markdown import WIKI_EMBED_RE, WIKI_LINK_RE, resolve_local
 from .index import SKIP_DIRS
 
 EDITABLE_EXTS = {".md", ".markdown", ".txt"}
@@ -380,30 +381,107 @@ def move_file(root: Path, versions_root: Path, rel: str, folder: str) -> dict:
         if fixed != text:
             _atomic_write(dest, fixed.encode("utf-8"))
 
-    updated = []
-    needles = {src.name, quote(src.name)}
-    for d, files in _walk(root):
-        for f in files:
-            p = d / f
-            if p == dest or p.suffix.lower() not in MARKDOWN_EXTS:
-                continue
-            try:
-                text = p.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            if not any(n in text for n in needles):
-                continue
-            fixed = _retarget(text, root, d, d, {src: dest})
-            if fixed != text:
-                _atomic_write(p, fixed.encode("utf-8"))
-                updated.append(p.relative_to(root).as_posix())
+    updated = _relink(root, src, dest, skip=dest)
+    _move_versions(root, versions_root, src, new_rel)
+    return {"path": new_rel, "updated": updated,
+            "images": sorted(p.relative_to(root).as_posix() for p in images.values())}
 
+
+def _move_versions(root: Path, versions_root: Path, src: Path, new_rel: str) -> None:
     old_vd, new_vd = _version_dir(versions_root, src.relative_to(root).as_posix()), _version_dir(versions_root, new_rel)
     if old_vd.is_dir() and not new_vd.exists():
         old_vd.rename(new_vd)
         (new_vd / "path.txt").write_text(new_rel)
-    return {"path": new_rel, "updated": sorted(updated),
-            "images": sorted(p.relative_to(root).as_posix() for p in images.values())}
+
+
+def _relink(root: Path, src: Path, dest: Path, skip: Path | None = None, names: Context | None = None) -> list[str]:
+    """Point the links in every Markdown note (but `skip`) that led to `src` at `dest`, which it has become.
+
+    Relative links are rewritten. With `names` (a lookup made before the file changed name), so are wiki links
+    ([[name]], ![[name]]) that found it by its old name. Returns the notes that changed.
+    """
+    updated = []
+    needles = {n.lower() for n in {src.name, quote(src.name)} | ({src.stem} if names else set())}
+    for d, p in _notes(root):
+        if p == skip:
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not any(n in text.lower() for n in needles):
+            continue
+        fixed = _retarget(text, root, d, d, {src: dest})
+        if names:
+            fixed = _rename_wiki_links(fixed, names, p if p != dest else src, root, src, dest)
+        if fixed != text:
+            _atomic_write(p, fixed.encode("utf-8"))
+            updated.append(p.relative_to(root).as_posix())
+    return sorted(updated)
+
+
+def _rename_wiki_links(md: str, names: Context, note: Path, root: Path, src: Path, dest: Path) -> str:
+    """Rename the wiki links in `md` (a note at `note`) that found `src` by name, keeping any folder, #heading or |alias."""
+    old_rel = src.relative_to(root).as_posix()
+
+    def fix(m: re.Match, embed: bool) -> str:
+        target = m.group(1).strip()
+        found = (resolve_local(names, note, target) or names.find_by_name(target)) if embed \
+            else (names.find_by_name(target) or names.find_by_name(target + ".md"))
+        if found != old_rel:
+            return m.group(0)
+        head, _, last = target.rpartition("/")
+        new = dest.name if last.lower() == src.name.lower() else dest.stem
+        a, b = m.span(1)
+        return m.group(0)[: a - m.start()] + (head + "/" if head else "") + new + m.group(0)[b - m.start():]
+
+    parts = []
+    for is_code, seg in split_code(md):
+        if not is_code:
+            seg = WIKI_EMBED_RE.sub(lambda m: fix(m, True), seg)
+            seg = WIKI_LINK_RE.sub(lambda m: fix(m, False), seg)
+        parts.append(seg)
+    return "".join(parts)
+
+
+def rename_file(root: Path, versions_root: Path, rel: str, name: str) -> dict:
+    """Give a file a new name in the same folder, and update the links to it in every Markdown note.
+
+    The extension stays (it is added when `name` leaves it out). A note whose title heading is still its old file
+    name ("# old name", as new notes start) gets the new name there too.
+    """
+    root = root.resolve()
+    src = inside(root, rel)
+    if not src.is_file():
+        raise EditError("File not found", 404)
+    name = name.strip()
+    if not name or "/" in name or "\\" in name:
+        raise EditError("Give a name without folders (use Move… to change the folder)")
+    if not name.lower().endswith(src.suffix.lower()):
+        name += src.suffix
+    new_rel = (src.parent / name).relative_to(root).as_posix()
+    dest = inside(root, new_rel)
+    if dest == src:
+        raise EditError("That is already its name")
+    if dest.exists() and not os.path.samefile(dest, src):  # a change of case only is fine on Windows
+        raise EditError(f"{new_rel} already exists", 409)
+    names = Context(root=root, cache_dir=root)
+    names.find_by_name(src.name)  # look up every name now, before the file has its new one
+    os.replace(src, dest)
+
+    retitled = False
+    if dest.suffix.lower() in MARKDOWN_EXTS:
+        text = dest.read_text(encoding="utf-8", errors="replace")
+        m = re.search(r"^#[ \t]+(.+?)[ \t]*$", text, re.M)
+        if m and m.group(1) in {src.stem, src.stem.replace("-", " ").replace("_", " ")}:
+            title = dest.stem if m.group(1) == src.stem else dest.stem.replace("-", " ").replace("_", " ")
+            text = text[: m.start(1)] + title + text[m.end(1):]
+            _atomic_write(dest, text.encode("utf-8"))
+            retitled = True
+
+    updated = [u for u in _relink(root, src, dest, names=names) if u != new_rel]
+    _move_versions(root, versions_root, src, new_rel)
+    return {"path": new_rel, "updated": updated, "retitled": retitled}
 
 
 def _safe_name(name: str) -> str:

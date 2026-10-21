@@ -5,7 +5,7 @@ import { state } from "./state.js";
 import { renderMarkdown } from "./markdown.js";
 import { closeEditor, confirmLeaveEditor, openEditor } from "./editor.js";
 import { renderGraph } from "./graph.js";
-import { moveCurrentDoc } from "./files.js";
+import { moveCurrentDoc, renameCurrentDoc } from "./files.js";
 import { setScope } from "./ask.js";
 import { setTask } from "./tasks.js";
 import { sideSearch } from "./tree.js";
@@ -154,6 +154,7 @@ export function bindViewer() {
   $$(".tab").forEach(t => (t.onclick = () => showView(t.dataset.view)));
   $("#doc-edit").onclick = () => state.currentDoc && openEditor(state.currentDoc);
   $("#doc-move").onclick = moveCurrentDoc;
+  $("#doc-rename").onclick = renameCurrentDoc;
   $("#doc-pdf").onclick = () => state.currentDoc && exportPdf(state.currentDoc);
   $("#doc-pdf-more").onclick = () => exportFolder(state.currentDoc ? folderOf(state.currentDoc) : "");
   $("#doc-ask").onclick = () => {

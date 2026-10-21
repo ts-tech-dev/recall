@@ -117,3 +117,31 @@ export function moveCurrentDoc() {
     return moveFile(path, folder);
   } });
 }
+
+/** Rename the note shown in Browse; the server updates the links to it (relative and [[wiki]] links). */
+export function renameCurrentDoc() {
+  const path = state.currentDoc;
+  if (!path) return;
+  if (state.editing?.path === path) return toast("Close the editor before renaming this note.");
+  const file = path.split("/").pop(), ext = /\.[^.]+$/.exec(file)?.[0] || "";
+  const dlg = $("#rename"), f = $("#rename-form"), input = f.elements.name;
+  input.value = file.slice(0, file.length - ext.length);
+  $("#rename-hint").textContent = `Keeps the ${ext || "same"} extension and its folder. Links to it in other notes are updated.`;
+  $("#rename-error").textContent = "";
+  $("#rename-cancel").onclick = () => dlg.close();
+  f.onsubmit = async e => {
+    e.preventDefault();
+    let r;
+    try {
+      r = await api("/api/rename", { method: "POST", headers: H, body: JSON.stringify({ path, name: input.value.trim() }) });
+    } catch (err) { $("#rename-error").textContent = err.message; return; }
+    dlg.close();
+    if (state.scopePath === path) setScope(r.path);
+    await loadTree();
+    openDoc(r.path, "", { force: true });
+    const n = r.updated.length;
+    toast(`Renamed to ${r.path.split("/").pop()}` + (n ? ` · updated links in ${n} note${n > 1 ? "s" : ""}` : ""), 3500);
+  };
+  dlg.showModal();
+  input.select();
+}

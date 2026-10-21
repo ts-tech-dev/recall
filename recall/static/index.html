@@ -128,6 +128,7 @@
             <button class="btn ghost small" id="doc-outline" title="Show the note's headings beside it" aria-pressed="false" hidden>Outline</button>
             <button class="btn ghost small" id="doc-pdf-toggle" hidden>Text view</button>
             <button class="btn small" id="doc-edit" hidden>Edit</button>
+            <button class="btn ghost small" id="doc-rename" title="Rename the file; links to it in other notes are updated">Rename…</button>
             <button class="btn ghost small" id="doc-move" title="Move to another folder (or drag it in the file list)">Move…</button>
             <button class="btn ghost small" id="doc-ask">Ask about this note</button>
             <span class="split" id="doc-pdf-group" hidden><button class="btn ghost small" id="doc-pdf" title="Save the note as a PDF to share with people who don't use Markdown">Export PDF</button><button class="btn ghost small" id="doc-pdf-more" title="Export several notes, or a whole folder, as one PDF…" aria-label="Export several notes as one PDF">▾</button></span>
@@ -258,6 +259,22 @@
     <div class="dialog-actions">
       <button type="button" class="btn ghost" id="place-cancel">Cancel</button>
       <button class="btn primary" id="place-ok"></button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Rename a file -->
+<dialog id="rename">
+  <form method="dialog" id="rename-form">
+    <h2>Rename</h2>
+    <label>New name
+      <input name="name" autocomplete="off" required>
+      <span class="hint" id="rename-hint"></span>
+    </label>
+    <p class="error" id="rename-error"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="rename-cancel">Cancel</button>
+      <button class="btn primary">Rename</button>
     </div>
   </form>
 </dialog>

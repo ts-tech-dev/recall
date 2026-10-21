@@ -32,6 +32,11 @@ class MoveBody(BaseModel):
     folder: str
 
 
+class RenameBody(BaseModel):
+    path: str
+    name: str
+
+
 class RenderBody(BaseModel):
     path: str
     markdown: str
@@ -60,6 +65,13 @@ def new_note(body: NewNoteBody, state: State = Depends(get_state), idx: Index = 
 @router.post("/move")
 def move(body: MoveBody, state: State = Depends(get_state), idx: Index = Depends(get_index)):
     res = editing.move_file(idx.root, idx.versions_dir, body.path, body.folder)
+    state.reindex_async(wait_turn=True)
+    return res
+
+
+@router.post("/rename")
+def rename(body: RenameBody, state: State = Depends(get_state), idx: Index = Depends(get_index)):
+    res = editing.rename_file(idx.root, idx.versions_dir, body.path, body.name)
     state.reindex_async(wait_turn=True)
     return res
 
