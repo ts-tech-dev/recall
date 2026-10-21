@@ -4,6 +4,7 @@ import { $, H, esc, snippetHtml, toast } from "./util.js";
 import { TYPE_LABELS, state } from "./state.js";
 import { renderMarkdown } from "./markdown.js";
 import { openDoc, showView } from "./viewer.js";
+import { saveNote } from "./files.js";
 
 export function renderTypeChips() {
   const groups = Object.keys(state.status?.type_groups || TYPE_LABELS);
@@ -140,12 +141,19 @@ export function bindAsk() {
   $("#copy-answer").onclick = async () => {
     try { await navigator.clipboard.writeText(state.answerMd); toast("Copied Markdown"); } catch { toast("Copy failed"); }
   };
+  const fileName = () => $("#answer-q").textContent.slice(0, 60).replace(/[^\w -]+/g, "").trim().replace(/\s+/g, "-");
   $("#download-answer").onclick = () => {
     const srcs = state.sources.map(s => `${s.n}. ${s.title} — ${s.heading} (${s.path})`).join("\n");
     const md = `# ${$("#answer-q").textContent}\n\n${state.answerMd}\n\n---\n**Sources**\n\n${srcs}\n`;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
-    a.download = $("#answer-q").textContent.slice(0, 60).replace(/[^\w -]+/g, "").trim().replace(/\s+/g, "-") + ".md";
+    a.download = fileName() + ".md";
     a.click(); URL.revokeObjectURL(a.href);
+  };
+  // The sources become links to the notes; the server turns them (and the images) into relative links.
+  $("#save-answer").onclick = () => {
+    const label = s => `${s.title} — ${s.heading}`.replaceAll("[", "(").replaceAll("]", ")");  // keeps the link whole
+    const srcs = state.sources.map(s => `${s.n}. [${label(s)}](#doc=${encodeURIComponent(s.path)})`).join("\n");
+    saveNote(fileName() || "answer", `# ${$("#answer-q").textContent}\n\n${state.answerMd}\n\n## Sources\n\n${srcs}\n`);
   };
 }

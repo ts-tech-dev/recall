@@ -10,9 +10,9 @@ import { closeEditor, confirmLeaveEditor, openEditor } from "./editor.js";
 
 /**
  * Show the folder picker. `action({folder, name})` runs on OK; if it throws, the error is shown and the
- * dialog stays open. `withName` adds a note name field; `file` is the name of a file being moved.
+ * dialog stays open. `withName` adds a note name field (filled in with `name`); `file` is the name of a file being moved.
  */
-export async function pickPlace({ title, ok, folder = "", withName = false, file = "", action }) {
+export async function pickPlace({ title, ok, folder = "", withName = false, name = "", file = "", action }) {
   let folders;
   try { folders = (await api("/api/folders")).folders; } catch (e) { toast(e.message); return; }
   const dlg = $("#place"), f = $("#place-form"), sel = $("#place-folder");
@@ -20,7 +20,8 @@ export async function pickPlace({ title, ok, folder = "", withName = false, file
   $("#place-ok").textContent = ok;
   sel.innerHTML = ["", ...folders].map(d => `<option value="${esc(d)}">${esc(folderLabel(d))}</option>`).join("");
   sel.value = folders.includes(folder) ? folder : "";
-  f.elements.newdir.value = f.elements.name.value = "";
+  f.elements.newdir.value = "";
+  f.elements.name.value = name;
   $("#place-newdir-row").hidden = true; $("#place-newdir-btn").hidden = false;
   $("#place-name-row").hidden = !withName;
   $("#place-error").textContent = "";
@@ -64,6 +65,23 @@ export async function newNote(folder) {
       closeEditor();
       await loadTree();
       openEditor(r.path);
+    },
+  });
+}
+
+/** Save Markdown (a saved Ask result) as a new note, after picking its folder and name, then show it. */
+export function saveNote(name, content) {
+  if (!state.status?.notes_dir) return openSettings();
+  let last = "";
+  try { last = localStorage.getItem("noteFolder") || ""; } catch {}
+  pickPlace({
+    title: "Save as note", ok: "Save", withName: true, name, folder: last,
+    action: async ({ folder, name }) => {
+      const r = await api("/api/note", { method: "POST", headers: H, body: JSON.stringify({ path: joinPath(folder, withExt(name)), content }) });
+      try { localStorage.setItem("noteFolder", folder); } catch {}
+      await loadTree();
+      openDoc(r.path);
+      toast("Saved as " + r.path);
     },
   });
 }

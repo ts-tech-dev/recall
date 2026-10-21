@@ -279,3 +279,23 @@ def test_move_note_image_name_clash(notes, tmp_path):
     assert r["images"] == ["b/images/pic-1.png"]
     assert (notes / "b/n.md").read_text() == "![p](images/pic-1.png)\n"
     assert (notes / "b/images/pic.png").read_bytes() == make_png(rgb=(1, 2, 3))  # untouched
+
+
+def test_saved_answer_gets_relative_links_and_its_images(api, notes):
+    """A saved Ask result: links to notes and images become relative, extracted images are copied next to it."""
+    hit = next(r for r in api.get("/api/search", params={"q": "kubelet"}).json()["results"] if r["images"])
+    cached = hit["images"][0]["url"]
+    assert cached.startswith("/api/cache-image/")
+    content = ("# Question\n\n![k8s](" + cached + ")\n![dns](/api/file?path=images/vlan-diagram.png)\n\n"
+               "1. [Router](#doc=networking%2Frouter.md)\n2. [Backups](#doc=backups.md)\n\n"
+               "```\n[keep](#doc=backups.md)\n```\n")
+    r = api.post("/api/note", json={"path": "answers/q.md", "content": content}, headers=H)
+    assert r.status_code == 200
+    text = (notes / "answers/q.md").read_text()
+    assert "![k8s](images/q_1.png)" in text and (notes / "answers/images/q_1.png").is_file()
+    assert "![dns](../images/vlan-diagram.png)" in text
+    assert "[Router](../networking/router.md)" in text and "[Backups](../backups.md)" in text
+    assert "[keep](#doc=backups.md)" in text  # code is left alone
+    # and the previewer resolves them again
+    d = api.get("/api/doc", params={"path": "answers/q.md"}).json()
+    assert "(#doc=networking/router.md)" in d["markdown"] and "/api/file?path=answers/images/q_1.png" in d["markdown"]

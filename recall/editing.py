@@ -8,8 +8,9 @@ import re
 import shutil
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from .extractors import EXTERNAL_RE, HTML_IMG_RE, IMAGE_EXTS, MD_IMAGE_RE, MD_LINK_RE, split_code
 from .index import SKIP_DIRS
@@ -147,7 +148,9 @@ def read_version(versions_root: Path, rel: str, vid: str) -> str:
     return f.read_text(encoding="utf-8", errors="replace")
 
 
-def create_note(root: Path, rel: str, title: str = "") -> dict:
+def create_note(root: Path, rel: str, title: str = "", content: str | None = None,
+                resolve_image: Callable[[str], Path | None] | None = None) -> dict:
+    """A new note: a "# title" heading, or `content` (its app links and images made local, see `localize_links`)."""
     rel = rel.strip()
     if not Path(rel).suffix:
         rel += ".md"
@@ -156,11 +159,61 @@ def create_note(root: Path, rel: str, title: str = "") -> dict:
         raise EditError("New notes must be .md or .txt")
     if p.exists():
         raise EditError("A file with that name already exists", 409)
-    title = title.strip() or p.stem.replace("-", " ").replace("_", " ")
+    rel = p.relative_to(root.resolve()).as_posix()
+    if content is None:
+        title = title.strip() or p.stem.replace("-", " ").replace("_", " ")
+        body = f"# {title}\n\n" if p.suffix.lower() != ".txt" else ""
+    else:
+        body = localize_links(root, rel, content, resolve_image)
+    data = body.encode("utf-8")
+    if len(data) > MAX_NOTE_BYTES:
+        raise EditError("Note is too large", 413)
     p.parent.mkdir(parents=True, exist_ok=True)
-    body = f"# {title}\n\n" if p.suffix.lower() != ".txt" else ""
-    _atomic_write(p, body.encode())
-    return {"path": p.relative_to(root.resolve()).as_posix(), "mtime_ns": stamp(p)}
+    _atomic_write(p, data)
+    return {"path": rel, "mtime_ns": stamp(p)}
+
+
+def localize_links(root: Path, note_rel: str, md: str, resolve_image: Callable[[str], Path | None] | None) -> str:
+    """Turn the app's own links in `md` (written by the browser, e.g. a saved Ask result) into plain relative ones.
+
+    "#doc=…" links to notes and "/api/file?path=…" images become paths relative to the note, so the note works
+    in any Markdown editor. Images extracted from PDFs and Office files ("/api/cache-image/…") only live in
+    Recall's cache, so they are copied into the `images` folder next to the note.
+    """
+    root = root.resolve()
+    base = inside(root, note_rel).parent
+
+    def fix(target: str) -> str | None:
+        if target.startswith("#doc="):
+            rel = unquote(target[5:].split("&")[0])
+        elif target.startswith("/api/file?"):
+            rel = parse_qs(urlparse(target).query).get("path", [""])[0]
+        elif target.startswith("/api/cache-image/") and resolve_image:
+            local = resolve_image(target)
+            return save_upload(root, note_rel, local.name, local.read_bytes())["link"] if local else None
+        else:
+            return None
+        if not rel:
+            return None
+        try:
+            dest = inside(root, rel)
+        except EditError:
+            return None
+        return quote(Path(os.path.relpath(dest, base)).as_posix(), safe="/")
+
+    parts = []
+    for is_code, seg in split_code(md):
+        if not is_code:
+            spans = {}
+            for rx in (MD_IMAGE_RE, MD_LINK_RE):
+                for m in rx.finditer(seg):
+                    spans[m.span(2)] = m.group(2)
+            for (a, b), target in sorted(spans.items(), reverse=True):
+                repl = fix(target)
+                if repl is not None:
+                    seg = seg[:a] + repl + seg[b:]
+        parts.append(seg)
+    return "".join(parts)
 
 
 def _walk(root: Path):

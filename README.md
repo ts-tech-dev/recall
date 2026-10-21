@@ -68,7 +68,9 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
 - **Ask**: type a question and get the passages from your notes that answer it best, as *Key passages*
   (short excerpts) or *Full passages* (longer ones, more of them). Filter by file type (Markdown, PDF, Word…),
   by folder, or limit the question to one note with *Ask about this note*. Each `[n]` links to its source,
-  and images from those passages are shown. Results can be copied or downloaded as `.md`. Recent questions
+  and images from those passages are shown. Results can be copied, downloaded as `.md`, or saved as a note (*Save as note…*): the passages with a
+  *Sources* list linking to the notes they came from. Its links and images are ordinary relative ones (images taken
+  from PDFs and Office files are copied next to it), so the note works in any Markdown editor. Recent questions
   are saved in the browser. *Passages retrieved for Ask* in Settings sets how many are fetched.
 - **Browse**: file tree with name filter, keyword search with highlighted snippets, and previews:
   rendered Markdown (relative images, Obsidian `![[embeds]]` and `[[wikilinks]]`), the browser's own PDF

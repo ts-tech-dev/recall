@@ -24,6 +24,7 @@ class SaveBody(BaseModel):
 class NewNoteBody(BaseModel):
     path: str
     title: str = ""
+    content: str | None = None  # instead of a "# title" heading (from a template, or a saved Ask result)
 
 
 class MoveBody(BaseModel):
@@ -51,7 +52,7 @@ def put_source(body: SaveBody, state: State = Depends(get_state), idx: Index = D
 
 @router.post("/note")
 def new_note(body: NewNoteBody, state: State = Depends(get_state), idx: Index = Depends(get_index)):
-    res = editing.create_note(idx.root, body.path, body.title)
+    res = editing.create_note(idx.root, body.path, body.title, body.content, idx.resolve_image)
     state.reindex_async(wait_turn=True)
     return res
 
