@@ -19,13 +19,15 @@ class AskBody(BaseModel):
     types: list[str] = []
     folder: str = ""
     path: str = ""
+    tag: str = ""
+    days: float = 0
 
 
 @router.post("/ask")
 def ask(body: AskBody, state: State = Depends(get_state), idx: Index = Depends(get_index)):
     if not body.question.strip():
         raise HTTPException(400, "Question is empty")
-    filters = Filters(types=body.types, folder=body.folder, path=body.path)
+    filters = Filters(types=body.types, folder=body.folder, path=body.path, tag=body.tag, days=max(body.days, 0))
 
     def gen():
         try:

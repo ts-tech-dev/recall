@@ -17,6 +17,7 @@ export async function loadTree() {
   } catch (e) { $("#tree").innerHTML = `<div class="tree-empty">${esc(e.message)}</div>`; return; }
   renderTree();
   fillFolderFilter();
+  fillTagFilter();
 }
 
 export function renderTree() {
@@ -47,6 +48,17 @@ export function fillFolderFilter() {
   walk(state.tree);
   sel.innerHTML = `<option value="">All folders</option>` + dirs.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
   sel.value = dirs.includes(cur) ? cur : "";
+}
+
+/** Tags for the Ask filter. A nested tag ("project/alpha") is also found by choosing its parent ("project"). */
+export async function fillTagFilter() {
+  let tags;
+  try { tags = (await api("/api/tags")).tags; } catch { return; }
+  const sel = $("#tag-filter"), cur = sel.value;
+  sel.innerHTML = `<option value="">All tags</option>` +
+    tags.map(t => `<option value="${esc(t.tag)}">#${esc(t.tag)} (${t.count})</option>`).join("");
+  sel.value = tags.some(t => t.tag === cur) ? cur : "";
+  sel.hidden = !tags.length;
 }
 
 // ------------------------------------------------------------------ sidebar search

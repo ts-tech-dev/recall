@@ -61,6 +61,8 @@ class Filters:
     types: list[str] = field(default_factory=list)  # group names or extensions
     folder: str = ""  # restrict to this folder (recursive)
     path: str = ""  # restrict to a single document
+    tag: str = ""  # only notes with this tag (or one nested under it: "project" also finds "project/alpha")
+    days: float = 0  # only files changed in the last `days` days
 
     def extensions(self) -> list[str]:
         exts: list[str] = []

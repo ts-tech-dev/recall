@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import time
 
 import numpy as np
 
@@ -17,6 +18,10 @@ log = logging.getLogger("recall.index")
 RERANK_FUSED = 20
 RERANK_PER_LIST = 15
 RERANK_CHARS = 1500  # passage text given to the cross-encoder (it reads ~512 tokens)
+
+
+def _like_escape(s: str) -> str:
+    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class SearchMixin:
@@ -49,10 +54,18 @@ class SearchMixin:
         if filters.folder.strip("/"):
             f = filters.folder.strip("/")
             where.append("(d.folder = ? OR d.folder LIKE ? ESCAPE '\\')")
-            args += [f, f.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"]
+            args += [f, _like_escape(f) + "/%"]
         if filters.path:
             where.append("d.path = ?")
             args.append(filters.path)
+        tag = filters.tag.strip().lstrip("#").lower()
+        if tag:
+            where.append("EXISTS (SELECT 1 FROM json_each(d.tags) t WHERE lower(t.value) = ? "
+                         "OR lower(t.value) LIKE ? ESCAPE '\\')")
+            args += [tag, _like_escape(tag) + "/%"]
+        if filters.days > 0:
+            where.append("d.mtime >= ?")
+            args.append(time.time() - filters.days * 86400)
         return where, args
 
     def _keyword(self, q: str, filters: Filters, fetch: int) -> list[dict]:
@@ -164,6 +177,22 @@ class SearchMixin:
         for r, s in zip(top, scores):
             r["rerank"] = round(s, 3)
         return sorted(top, key=lambda r: -r["rerank"]) + [r for r in ranked if r["id"] not in pick]
+
+    def tags(self) -> list[dict]:
+        """Every tag on a note, with how many notes have it. Case differences count as one tag, and the parents
+        of nested tags are listed too ("project/alpha" counts for "project"), as the tag filter finds them."""
+        with self._conn() as c:
+            rows = c.execute("SELECT d.id, t.value FROM docs d, json_each(d.tags) t WHERE d.kind='note'").fetchall()
+        notes: dict[str, set] = {}
+        names: dict[str, str] = {}
+        for doc_id, tag in rows:
+            parts = str(tag).lstrip("#").strip("/").split("/")
+            for i in range(1, len(parts) + 1):
+                name = "/".join(parts[:i])
+                if name:
+                    names.setdefault(name.lower(), name)
+                    notes.setdefault(name.lower(), set()).add(doc_id)
+        return [{"tag": names[k], "count": len(notes[k])} for k in sorted(notes)]
 
     def doc_info(self, rel: str) -> dict | None:
         with self._conn() as c:

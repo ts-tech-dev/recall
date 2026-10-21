@@ -9,10 +9,16 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/search")
-def search(q: str, types: str = "", folder: str = "", path: str = "", limit: int = Query(20, ge=1, le=100),
-           mode: str = Query("hybrid", pattern="^(hybrid|keyword|semantic)$"), idx: Index = Depends(get_index)):
-    filters = Filters(types=[t for t in types.split(",") if t], folder=folder, path=path)
+def search(q: str, types: str = "", folder: str = "", path: str = "", tag: str = "", days: float = Query(0, ge=0),
+           limit: int = Query(20, ge=1, le=100), mode: str = Query("hybrid", pattern="^(hybrid|keyword|semantic)$"),
+           idx: Index = Depends(get_index)):
+    filters = Filters(types=[t for t in types.split(",") if t], folder=folder, path=path, tag=tag, days=days)
     return {"results": idx.search(q, filters, limit=limit, mode=mode)}
+
+
+@router.get("/tags")
+def tags(idx: Index = Depends(get_index)):
+    return {"tags": idx.tags()}
 
 
 @router.get("/related")

@@ -43,7 +43,8 @@ export async function ask(question, mode) {
   try {
     const r = await fetch("/api/ask", {
       method: "POST", headers: H, signal: ctrl.signal,
-      body: JSON.stringify({ question, mode, types: [...state.types], folder: $("#folder-filter").value, path: state.scopePath }),
+      body: JSON.stringify({ question, mode, types: [...state.types], folder: $("#folder-filter").value, path: state.scopePath,
+        tag: $("#tag-filter").value, days: +$("#days-filter").value }),
     });
     if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail; } catch {} throw new Error(m); }
     const reader = r.body.getReader(), dec = new TextDecoder();

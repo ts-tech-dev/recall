@@ -96,6 +96,29 @@ def test_filter_by_single_document(index):
     }
 
 
+def test_filter_by_tag_including_nested_tags(index, notes):
+    (notes / "lab.md").write_text("# Lab\n\nThe router lab is tagged #homelab/network and #Ideas.\n")
+    index.build()
+    q = "router VLAN"
+    assert set(paths(index.search(q, Filters(tag="networking")))) == {"networking/vlans.md"}
+    assert set(paths(index.search(q, Filters(tag="#homelab")))) == {"networking/vlans.md", "lab.md"}
+    assert set(paths(index.search(q, Filters(tag="homelab/NETWORK")))) == {"lab.md"}
+    assert index.search(q, Filters(tag="home")) == []  # a tag's prefix is not its parent
+    tags = {t["tag"]: t["count"] for t in index.tags()}
+    assert tags["homelab"] == 2 and tags["homelab/network"] == 1 and tags["Ideas"] == 1
+
+
+def test_filter_by_days_since_change(index, notes):
+    old = time.time() - 40 * 86400
+    for p in notes.rglob("*"):
+        if p.is_file():
+            os.utime(p, (old, old))
+    (notes / "networking/router.md").write_text("# Router\n\nThe router got a new VLAN today.\n")
+    index.build()
+    assert paths(index.search("router VLAN", Filters(days=7), mode="keyword")) == ["networking/router.md"]
+    assert len(set(paths(index.search("router VLAN", Filters(days=60), mode="keyword")))) > 1
+
+
 def test_filters_combined(index):
     assert index.search("VLAN", Filters(types=["pdf"], folder="networking")) == []
 
