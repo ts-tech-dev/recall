@@ -5,6 +5,7 @@ import { ICONS, state } from "./state.js";
 import { openSettings } from "./settings.js";
 import { moveFile, newNote } from "./files.js";
 import { openDoc } from "./viewer.js";
+import { exportFolder } from "./export.js";
 
 export async function loadTree() {
   if (!state.status?.notes_dir) {
@@ -30,7 +31,7 @@ export function renderTree() {
         const inner = build(c);
         if (!inner && filter) continue;
         const cls = !filter && collapsed.includes(c.path) ? "dir collapsed" : "dir";
-        items.push(`<li class="${cls}" data-dir="${esc(c.path)}"><div class="node" role="treeitem"><span class="ico chev" aria-hidden="true"></span><span class="name">${esc(c.name)}</span><button class="add" data-add="${esc(c.path)}" title="New note in ${esc(c.path)}" aria-label="New note in ${esc(c.path)}">+</button></div>${inner || "<ul></ul>"}</li>`);
+        items.push(`<li class="${cls}" data-dir="${esc(c.path)}"><div class="node" role="treeitem"><span class="ico chev" aria-hidden="true"></span><span class="name">${esc(c.name)}</span><button class="add pdf" data-export="${esc(c.path)}" title="Export notes in ${esc(c.path)} as one PDF" aria-label="Export notes in ${esc(c.path)} as one PDF">PDF</button><button class="add" data-add="${esc(c.path)}" title="New note in ${esc(c.path)}" aria-label="New note in ${esc(c.path)}">+</button></div>${inner || "<ul></ul>"}</li>`);
       } else {
         if (filter && !c.path.toLowerCase().includes(filter)) continue;
         const active = state.currentDoc === c.path ? " active" : "";
@@ -117,7 +118,7 @@ export function bindTree() {
   $("#toggle-sidebar").onclick = () => $("#sidebar").classList.toggle("open");
   $("#tree").addEventListener("click", e => {
     const add = e.target.closest(".add");
-    if (add) return newNote(add.dataset.add);
+    if (add) return add.dataset.export !== undefined ? exportFolder(add.dataset.export) : newNote(add.dataset.add);
     const node = e.target.closest(".node");
     if (!node) return;
     if (node.dataset.path) return openDoc(node.dataset.path);

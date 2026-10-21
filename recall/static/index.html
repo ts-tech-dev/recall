@@ -130,7 +130,7 @@
             <button class="btn small" id="doc-edit" hidden>Edit</button>
             <button class="btn ghost small" id="doc-move" title="Move to another folder (or drag it in the file list)">Move…</button>
             <button class="btn ghost small" id="doc-ask">Ask about this note</button>
-            <button class="btn ghost small" id="doc-pdf" title="Save the note as a PDF to share with people who don't use Markdown" hidden>Export PDF</button>
+            <span class="split" id="doc-pdf-group" hidden><button class="btn ghost small" id="doc-pdf" title="Save the note as a PDF to share with people who don't use Markdown">Export PDF</button><button class="btn ghost small" id="doc-pdf-more" title="Export several notes, or a whole folder, as one PDF…" aria-label="Export several notes as one PDF">▾</button></span>
             <a class="btn ghost small" id="doc-raw" target="_blank" rel="noopener">Open original</a>
           </div>
         </div>
@@ -254,6 +254,22 @@
     <div class="dialog-actions">
       <button type="button" class="btn ghost" id="place-cancel">Cancel</button>
       <button class="btn primary" id="place-ok"></button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Export several notes as one PDF -->
+<dialog id="export">
+  <form method="dialog" id="export-form">
+    <h2>Export notes as PDF</h2>
+    <label>Folder <select id="export-folder"></select></label>
+    <label>Title <input name="title" autocomplete="off"></label>
+    <label class="check"><input type="checkbox" name="toc" checked> Title page with a table of contents</label>
+    <div class="export-head"><span class="hint" id="export-count"></span><button type="button" class="btn ghost small" id="export-all">Select all / none</button></div>
+    <div class="export-list" id="export-list"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn ghost" id="export-cancel">Cancel</button>
+      <button class="btn primary" id="export-ok">Export PDF</button>
     </div>
   </form>
 </dialog>

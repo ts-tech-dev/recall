@@ -87,6 +87,10 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   it out for paper, always in light colors, with its images, tables, math, code and diagrams, page numbers, and
   folded callouts opened. Your browser's print dialog then opens: choose *Save as PDF* as the printer. Turn off the
   browser's *Headers and footers* option for a cleaner page. Web links stay clickable in the PDF.
+  To put several notes in one PDF, use the **▾** next to *Export PDF*, or the **PDF** button that appears when you point
+  at a folder in the file list. Pick the folder (or the whole notes folder), untick the notes you want to leave out,
+  and give it a title. The PDF starts with a title page and a clickable table of contents, each note starts on a new
+  page, and links between the exported notes jump to each other.
 - **Themes**: pick *Auto* (follows your system), *Light*, *Grey* or *Dark* from the menu in the top bar. The choice is
   remembered by the browser.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to

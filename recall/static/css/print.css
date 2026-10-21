@@ -26,10 +26,21 @@
 html, body { margin: 0; background: #fff; color: var(--text); }
 body { font: 10.5pt/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 
-.paper-head { margin-bottom: 16pt; }
+.paper-head { margin-bottom: 18pt; }
 .paper-head h1 { font-size: 22pt; line-height: 1.2; margin: 0 0 6pt; padding-bottom: 6pt; border-bottom: 2px solid var(--accent); }
 .paper-tags { display: flex; flex-wrap: wrap; gap: 4pt; }
 .tag { font-size: 8.5pt; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1pt 7pt; }
+
+/* several notes: a title page with the contents, then each note from a new page */
+.cover { margin: 30mm 0 14mm; }
+.cover h1 { font-size: 28pt; }
+.cover .sub { color: var(--muted); font-size: 11pt; }
+.contents h2 { font-size: 13pt; margin: 0 0 8pt; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.contents ol { margin: 0; padding-left: 1.6em; }
+.contents li { margin: 0 0 5pt; break-inside: avoid; }
+.contents a { color: var(--text); text-decoration: none; font-weight: 600; }
+.contents .where { display: block; color: var(--muted); font-size: 8.5pt; }
+.note { break-before: page; }
 
 /* headings */
 .md h1 { font-size: 20pt; padding-bottom: 4pt; border-bottom: 1px solid var(--border); }
