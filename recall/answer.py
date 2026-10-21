@@ -9,6 +9,8 @@ from .config import Settings
 from .index import HL_END, HL_START, Filters, Index
 
 MODES = ("summary", "report")
+# "[image: alt]" (chunker.py) and "[image 'alt' text in image: …]" (OCR text, index/build.py) markers in passages
+IMAGE_MARK_RE = re.compile(r"""\s*\[image(?: (?:'[^']*'|"[^"]*"))?(?: text in image)?: [^\]]*\]""")
 
 
 def retrieve(index: Index, question: str, filters: Filters | None, top_k: int) -> list[dict]:
@@ -35,7 +37,7 @@ def local_answer(question: str, mode: str, hits: list[dict]) -> str:
         out.append("")
         snippet = h.get("snippet", "").replace(HL_START, "**").replace(HL_END, "**")
         body = snippet if mode == "summary" and snippet else _excerpt(h["text"], words)
-        body = re.sub(r"\s*\[image: [^\]]*\]", "", body)  # the images are shown below
+        body = IMAGE_MARK_RE.sub("", body)  # the images are shown below
         out.append("> " + body.replace("\n", "\n> "))
         out.append("")
         for img in h["images"][: 1 if mode == "summary" else 3]:

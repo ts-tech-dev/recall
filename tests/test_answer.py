@@ -45,3 +45,13 @@ def test_filters_reach_retrieval(index):
 def test_top_k_limits_sources(index):
     out = collect(answer_events(index, Settings(top_k=2), "VLAN network router DNS", "report"))
     assert len(out["sources"]) <= 2
+
+
+def test_image_markers_are_left_out_of_passages():
+    from recall.answer import local_answer
+
+    hit = {"n": 1, "title": "T", "heading": "H", "images": [], "snippet": "",
+           "text": "Before [image: diagram] middle [image 'Overview chart' text in image: Recall] "
+                   "[image \"it's\" text in image: x] [image text in image: y] after"}
+    out = local_answer("q", "report", [hit])
+    assert "> Before middle after" in out

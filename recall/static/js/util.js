@@ -12,7 +12,7 @@ export function slugify(s) {
   return s.toLowerCase().replace(/[^\p{L}\p{N}_\s-]/gu, "").trim().replace(/\s+/g, "-");
 }
 export function snippetHtml(s) {
-  s = String(s ?? "").replace(/\s*\[image: [^\]]*\]/g, "").replace(/\*\*/g, "");
+  s = String(s ?? "").replace(/\s*\[image(?: (?:'[^']*'|"[^"]*"))?(?: text in image)?: [^\]]*\]/g, "").replace(/\*\*/g, "");
   return esc(s).replaceAll("\x02", "<mark>").replaceAll("\x03", "</mark>");
 }
 export function toast(msg, ms = 2500) {
