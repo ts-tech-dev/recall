@@ -91,6 +91,9 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   at a folder in the file list. Pick the folder (or the whole notes folder), untick the notes you want to leave out,
   and give it a title. The PDF starts with a title page and a clickable table of contents, each note starts on a new
   page, and links between the exported notes jump to each other.
+- **Go to note (Ctrl+K)**: press Ctrl+K (⌘K on a Mac), or *Go to note…* in the top bar, and type part of a file's
+  name or folder. Several words narrow it down, and letters in order also match (`prjpln` finds *project-plan*).
+  ↑/↓ and Enter open it. With nothing typed, it lists the notes you opened recently.
 - **Templates**: Markdown notes in a `templates` folder at the top of your notes folder are offered when you create
   a note (*+ Note*, or **+** on a folder). The new note gets the template's text, with `{{title}}` (the note's name),
   `{{date}}` (2026-10-21) and `{{time}}` (14:05) filled in. Dates can be formatted as in Obsidian, for example

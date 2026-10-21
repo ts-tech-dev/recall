@@ -32,3 +32,14 @@ dialog.wide { width: min(720px, calc(100vw - 32px)); }
 .linkcheck a:hover { text-decoration: underline; }
 .linkcheck code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
 .lc-note > a { font-weight: 600; font-size: 14px; }
+/* quick switcher (Ctrl+K) */
+dialog.switcher { margin-top: 12vh; padding: 10px; width: min(620px, calc(100vw - 32px)); }
+.switcher input { width: 100%; font-size: 16px; padding: 10px 12px; }
+.switcher ul { list-style: none; margin: 8px 0 6px; padding: 0; max-height: min(420px, 55vh); overflow: auto; }
+.switcher li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.switcher li .ico { width: 26px; text-align: center; flex: none; }
+.switcher li .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.switcher li .where { margin-left: auto; padding-left: 12px; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0; }
+.switcher li[aria-selected="true"] { background: var(--accent-soft); }
+.switcher li.none { color: var(--muted); cursor: default; }
+.switcher .hint { padding: 0 10px 2px; }

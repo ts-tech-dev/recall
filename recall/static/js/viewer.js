@@ -10,6 +10,7 @@ import { setScope } from "./ask.js";
 import { setTask } from "./tasks.js";
 import { sideSearch } from "./tree.js";
 import { exportFolder, exportPdf } from "./export.js";
+import { rememberRecent } from "./switcher.js";
 
 export function showView(name) {
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
@@ -28,6 +29,7 @@ export async function openDoc(path, anchor = "", { pushHash = true, force = fals
   if (pushHash) history.replaceState(null, "", "#doc=" + encodeURIComponent(path) + (anchor ? "&a=" + encodeURIComponent(anchor) : ""));
   if (state.currentDoc !== path || force) {
     state.currentDoc = path;
+    rememberRecent(path);
     $$(".node.active").forEach(n => n.classList.remove("active"));
     $$(".node[data-path]").forEach(n => { if (n.dataset.path === path) n.classList.add("active"); });
     $("#doc-empty").hidden = true; $("#doc").hidden = false;

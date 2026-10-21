@@ -50,4 +50,6 @@ shown with the passage.
 7. ✅ Folder watcher (watchdog, debounced); the UI polls the index version and refreshes.
 8. ✅ Links table, backlinks, similar notes, and a d3 force-directed graph.
 9. ✅ In-browser editing: conflict-checked atomic saves, version history, new notes, image paste/upload.
-10. Next: saving Ask results as notes, tag/date filters, login for remote access.
+10. ✅ Saving Ask results as notes, tag and date filters, PDF export (one note or a folder), templates, link check,
+    renaming with link updates, quick switcher (Ctrl+K).
+11. Next: login for remote access.

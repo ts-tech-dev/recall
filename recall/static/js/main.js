@@ -8,6 +8,7 @@
 //   graph.js     Graph view                                     theme.js   Auto / Light / Grey / Dark
 //   appctl.js    Windows app: port and shut down                export.js  Export PDF (print layout)
 //   templates.js new notes from templates                       linkcheck.js  broken links, unlinked notes
+//   switcher.js  quick switcher (Ctrl+K)
 
 import { state } from "./state.js";
 import { bindAsk, renderHistory, renderTypeChips } from "./ask.js";
@@ -20,6 +21,7 @@ import { bindViewer, route } from "./viewer.js";
 import { bindTheme } from "./theme.js";
 import { bindAppControls } from "./appctl.js";
 import { bindLinkCheck } from "./linkcheck.js";
+import { bindSwitcher } from "./switcher.js";
 
 bindTheme();
 bindViewer();
@@ -31,6 +33,7 @@ bindEditor();
 bindGraph();
 bindAppControls();
 bindLinkCheck();
+bindSwitcher();
 
 await refreshStatus();
 renderTypeChips();

@@ -53,3 +53,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 .side-filter { padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .check.small { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.switch-btn { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.switch-btn kbd { font: 11px ui-monospace, monospace; padding: 0 5px; border: 1px solid var(--border); border-radius: 4px; }
+@media (max-width: 900px) { .switch-btn kbd { display: none; } }
+@media (max-width: 700px) { .switch-btn { display: none; } }

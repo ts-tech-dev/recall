@@ -37,6 +37,7 @@
     <button role="tab" data-view="graph" class="tab">Graph</button>
   </nav>
   <div class="spacer"></div>
+  <button class="btn ghost switch-btn" id="open-switcher" title="Go to a note by name (Ctrl+K)">Go to note… <kbd>Ctrl K</kbd></button>
   <div class="status" id="status" title="Index status"></div>
   <button class="btn ghost" id="reindex" title="Scan the notes folder for new or changed files">Re-index</button>
   <select id="theme" class="theme-select" aria-label="Color theme" title="Color theme">
@@ -261,6 +262,13 @@
       <button class="btn primary" id="place-ok"></button>
     </div>
   </form>
+</dialog>
+
+<!-- Quick switcher (Ctrl+K) -->
+<dialog id="switcher" class="switcher" aria-label="Go to note">
+  <input id="switch-q" type="search" placeholder="Go to note… (type part of its name or folder)" autocomplete="off" aria-controls="switch-list">
+  <ul id="switch-list" role="listbox"></ul>
+  <div class="hint">↑ ↓ to choose · Enter to open · Esc to close</div>
 </dialog>
 
 <!-- Rename a file -->
