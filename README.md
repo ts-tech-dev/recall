@@ -91,6 +91,11 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   at a folder in the file list. Pick the folder (or the whole notes folder), untick the notes you want to leave out,
   and give it a title. The PDF starts with a title page and a clickable table of contents, each note starts on a new
   page, and links between the exported notes jump to each other.
+- **Templates**: Markdown notes in a `templates` folder at the top of your notes folder are offered when you create
+  a note (*+ Note*, or **+** on a folder). The new note gets the template's text, with `{{title}}` (the note's name),
+  `{{date}}` (2026-10-21) and `{{time}}` (14:05) filled in. Dates can be formatted as in Obsidian, for example
+  `{{date:dddd D MMMM YYYY}}` gives *Wednesday 21 October 2026* (`YYYY YY MMMM MMM MM M DD D dddd ddd HH H mm ss`;
+  text in `[brackets]` is kept as it is).
 - **Themes**: pick *Auto* (follows your system), *Light*, *Grey* or *Dark* from the menu in the top bar. The choice is
   remembered by the browser.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to

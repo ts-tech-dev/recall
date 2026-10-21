@@ -7,12 +7,14 @@ import { loadTree } from "./tree.js";
 import { openDoc } from "./viewer.js";
 import { setScope } from "./ask.js";
 import { closeEditor, confirmLeaveEditor, openEditor } from "./editor.js";
+import { fillTemplate, listTemplates, templateName } from "./templates.js";
 
 /**
  * Show the folder picker. `action({folder, name})` runs on OK; if it throws, the error is shown and the
- * dialog stays open. `withName` adds a note name field (filled in with `name`); `file` is the name of a file being moved.
+ * dialog stays open. `withName` adds a note name field (filled in with `name`); `file` is the name of a file being moved;
+ * `templates` (paths) adds a choice of template, passed to `action` as `template`.
  */
-export async function pickPlace({ title, ok, folder = "", withName = false, name = "", file = "", action }) {
+export async function pickPlace({ title, ok, folder = "", withName = false, name = "", file = "", templates = [], action }) {
   let folders;
   try { folders = (await api("/api/folders")).folders; } catch (e) { toast(e.message); return; }
   const dlg = $("#place"), f = $("#place-form"), sel = $("#place-folder");
@@ -24,6 +26,9 @@ export async function pickPlace({ title, ok, folder = "", withName = false, name
   f.elements.name.value = name;
   $("#place-newdir-row").hidden = true; $("#place-newdir-btn").hidden = false;
   $("#place-name-row").hidden = !withName;
+  $("#place-template-row").hidden = !templates.length;
+  $("#place-template").innerHTML = `<option value="">None (empty note)</option>` +
+    templates.map(t => `<option value="${esc(t)}">${esc(templateName(t))}</option>`).join("");
   $("#place-error").textContent = "";
 
   const target = () => joinPath(sel.value, f.elements.newdir.value.trim());
@@ -43,7 +48,7 @@ export async function pickPlace({ title, ok, folder = "", withName = false, name
     e.preventDefault();
     const name = f.elements.name.value.trim();
     if (withName && !name) { $("#place-error").textContent = "Give the note a name."; return; }
-    try { await action({ folder: target(), name }); dlg.close(); }
+    try { await action({ folder: target(), name, template: f.elements.template.value }); dlg.close(); }
     catch (err) { $("#place-error").textContent = err.message; }
   };
   dlg.showModal();
@@ -57,10 +62,14 @@ export async function newNote(folder) {
   let last = "";
   try { last = localStorage.getItem("noteFolder") || ""; } catch {}
   pickPlace({
-    title: "New note", ok: "Create", withName: true,
+    title: "New note", ok: "Create", withName: true, templates: listTemplates(),
     folder: folder ?? (state.currentDoc ? folderOf(state.currentDoc) : last),
-    action: async ({ folder, name }) => {
-      const r = await api("/api/note", { method: "POST", headers: H, body: JSON.stringify({ path: joinPath(folder, withExt(name)) }) });
+    action: async ({ folder, name, template }) => {
+      const path = joinPath(folder, withExt(name));
+      const content = template
+        ? fillTemplate((await api("/api/source?path=" + encodeURIComponent(template))).content, { title: name.replace(/\.(md|markdown|txt)$/i, "") })
+        : undefined;
+      const r = await api("/api/note", { method: "POST", headers: H, body: JSON.stringify({ path, content }) });
       try { localStorage.setItem("noteFolder", folder); } catch {}
       closeEditor();
       await loadTree();
