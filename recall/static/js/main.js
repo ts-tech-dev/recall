@@ -7,6 +7,7 @@
 //   ask.js       Ask view (answers, sources, history)           files.js   new note / move dialogs
 //   graph.js     Graph view                                     theme.js   Auto / Light / Grey / Dark
 //   appctl.js    Windows app: port and shut down                export.js  Export PDF (print layout)
+//   templates.js new notes from templates                       linkcheck.js  broken links, unlinked notes
 
 import { state } from "./state.js";
 import { bindAsk, renderHistory, renderTypeChips } from "./ask.js";
@@ -18,6 +19,7 @@ import { bindTree, loadTree } from "./tree.js";
 import { bindViewer, route } from "./viewer.js";
 import { bindTheme } from "./theme.js";
 import { bindAppControls } from "./appctl.js";
+import { bindLinkCheck } from "./linkcheck.js";
 
 bindTheme();
 bindViewer();
@@ -28,6 +30,7 @@ bindAsk();
 bindEditor();
 bindGraph();
 bindAppControls();
+bindLinkCheck();
 
 await refreshStatus();
 renderTypeChips();

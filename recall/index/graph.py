@@ -19,6 +19,15 @@ class GraphMixin:
                 "WHERE l.dst_path=? ORDER BY s.title", (rel,)).fetchall()
         return {"outgoing": [dict(r) for r in out], "backlinks": [dict(r) for r in back]}
 
+    def unlinked_notes(self) -> list[dict]:
+        """Notes that no other note links to."""
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT d.path, d.title, d.mtime FROM docs d WHERE d.kind='note' AND NOT EXISTS ("
+                "SELECT 1 FROM links l JOIN docs s ON s.id=l.src_id WHERE l.dst_path=d.path AND s.path != d.path) "
+                "ORDER BY lower(d.path)").fetchall()
+        return [dict(r) for r in rows]
+
     def _doc_vectors(self) -> tuple[list[dict], np.ndarray]:
         """One vector per note: the normalized mean of its chunk vectors."""
         cache = self._doc_vec_cache

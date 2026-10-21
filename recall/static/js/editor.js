@@ -18,7 +18,8 @@ export function setEditorState(msg) {
   $("#ed-state").textContent = msg ?? (isDirty() ? "● unsaved changes" : "saved");
 }
 
-export async function openEditor(path) {
+/** Open a note in the editor. `line` (1-based) puts the cursor there, selecting `find` if it is on that line. */
+export async function openEditor(path, { line = 0, find = "" } = {}) {
   let src;
   try { src = await api("/api/source?path=" + encodeURIComponent(path)); }
   catch (e) { toast(e.message); return; }
@@ -34,6 +35,13 @@ export async function openEditor(path) {
   renderEditorPreview();
   loadVersions();
   ta.focus();
+  if (line > 0) {
+    const lines = src.content.split("\n");
+    const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+    const at = Math.max(0, (lines[line - 1] ?? "").indexOf(find));
+    ta.setSelectionRange(start + at, start + at + (find && lines[line - 1]?.includes(find) ? find.length : 0));
+    ta.blur(); ta.focus();  // scrolls the selection into view
+  }
 }
 
 export function closeEditor() {

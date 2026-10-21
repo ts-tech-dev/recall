@@ -180,6 +180,7 @@
         <label class="check small"><input type="checkbox" id="graph-similar" checked> similarity links</label>
         <label class="check small"><input type="checkbox" id="graph-orphans" checked> unconnected notes</label>
         <label class="check small"><input type="checkbox" id="graph-local"> only around current note</label>
+        <button class="btn ghost small" id="graph-linkcheck" title="Find links that lead nowhere, and notes nothing links to">Check links…</button>
         <span class="muted small" id="graph-info"></span>
         <span class="legend"><i class="ln link"></i> link <i class="ln similar"></i> similar topic</span>
       </div>
@@ -259,6 +260,13 @@
       <button class="btn primary" id="place-ok"></button>
     </div>
   </form>
+</dialog>
+
+<!-- Link check -->
+<dialog id="linkcheck" class="wide">
+  <h2>Link check</h2>
+  <div id="linkcheck-body" class="linkcheck"></div>
+  <div class="dialog-actions"><button type="button" class="btn ghost" id="linkcheck-close">Close</button></div>
 </dialog>
 
 <!-- Export several notes as one PDF -->

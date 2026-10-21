@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, Query
 
+from .. import linkcheck
 from ..index import Filters, Index
 from ..state import get_index
 
@@ -29,3 +30,9 @@ def related(path: str, idx: Index = Depends(get_index)):
 @router.get("/graph")
 def graph(similar: bool = True, idx: Index = Depends(get_index)):
     return idx.graph(similar=similar)
+
+
+@router.get("/linkcheck")
+def check_links(idx: Index = Depends(get_index)):
+    """Broken links in notes, and notes nothing links to."""
+    return linkcheck.check(idx)

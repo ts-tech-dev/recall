@@ -96,6 +96,9 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   `{{date}}` (2026-10-21) and `{{time}}` (14:05) filled in. Dates can be formatted as in Obsidian, for example
   `{{date:dddd D MMMM YYYY}}` gives *Wednesday 21 October 2026* (`YYYY YY MMMM MMM MM M DD D dddd ddd HH H mm ss`;
   text in `[brackets]` is kept as it is).
+- **Link check**: *Check links…* in the Graph view lists the links in your Markdown notes that lead nowhere (a
+  `[[note]]` or image that doesn't exist, a relative link to a moved file), with their line. Click one to open the
+  editor right on it. It also lists the notes nothing links to. Code and the `templates` folder are left out.
 - **Themes**: pick *Auto* (follows your system), *Light*, *Grey* or *Dark* from the menu in the top bar. The choice is
   remembered by the browser.
 - **Checkboxes**: tick a task (`- [ ] item`, or `[ ] item` on its own line) in a note's preview and it is saved to

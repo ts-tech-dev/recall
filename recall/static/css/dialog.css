@@ -22,3 +22,13 @@ dialog legend { font-weight: 600; padding: 0 6px; }
 .export-head { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .export-list { max-height: min(320px, 45vh); overflow: auto; border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; margin-top: 6px; }
 .export-list label.check { margin: 4px 0; align-items: center; overflow-wrap: anywhere; }
+dialog.wide { width: min(720px, calc(100vw - 32px)); }
+.linkcheck { max-height: min(520px, 65vh); overflow: auto; }
+.linkcheck h3 { font-size: 15px; margin: 16px 0 6px; }
+.linkcheck h3:first-child { margin-top: 0; }
+.linkcheck ul { margin: 2px 0 8px; padding-left: 18px; }
+.linkcheck li { margin: 2px 0; font-size: 13px; }
+.linkcheck a { color: var(--accent); text-decoration: none; }
+.linkcheck a:hover { text-decoration: underline; }
+.linkcheck code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.lc-note > a { font-weight: 600; font-size: 14px; }
