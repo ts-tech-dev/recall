@@ -1,7 +1,9 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
-pymupdf>=1.24
+# 2.0 pulls in pymupdf-layout (60 MB of onnx models, pymupdf4llm, networkx) that Recall doesn't use,
+# and the Windows app crashed on PDFs because PyInstaller left out its model files
+pymupdf>=1.24,<2
 python-docx>=1.1
 python-pptx>=1.0
 openpyxl>=3.1
