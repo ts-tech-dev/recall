@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .. import __version__
 from ..embeddings import Embedder
 from ..extractors import IMAGE_EXTS, NOTE_TYPES, Context, ExtractedDoc, extract
 from ..extractors.cache import ExtractCache
@@ -102,6 +103,11 @@ class Index(BuildMixin, SearchMixin, GraphMixin):
                           "JOIN image_meta m ON m.key=di.key WHERE m.caption != '')")
                 c.execute("ALTER TABLE image_meta DROP COLUMN caption")
                 c.execute("ALTER TABLE image_meta DROP COLUMN caption_model")
+            # A new version of Recall may read files the last one failed on: retry them once.
+            row = c.execute("SELECT value FROM meta WHERE key='app_version'").fetchone()
+            if (row[0] if row else None) != __version__:
+                c.execute("UPDATE docs SET mtime=-1 WHERE error IS NOT NULL")
+                c.execute("INSERT OR REPLACE INTO meta VALUES('app_version', ?)", (__version__,))
             # Vectors from a different embedding model are not comparable: drop them.
             want = self.embedder.name if self.embedder else ""
             row = c.execute("SELECT value FROM meta WHERE key='embed_model'").fetchone()

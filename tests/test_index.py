@@ -29,6 +29,15 @@ def test_incremental_rebuild(index, notes):
     assert paths(index.search("zeppelin")) == ["new.md"]
 
 
+def test_failed_files_are_retried_after_an_upgrade(index, notes, data, monkeypatch):
+    assert index.build()["unchanged"] == 13  # same version: the broken file isn't read again
+    import recall.index.core as core
+
+    monkeypatch.setattr(core, "__version__", "99.0.0")
+    s = Index(notes, data).build()
+    assert (s["unchanged"], s["errors"]) == (12, 1)
+
+
 def test_full_rebuild(index):
     s = index.build(full=True)
     assert s["added"] == 12 and s["errors"] == 1
