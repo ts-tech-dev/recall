@@ -1,12 +1,23 @@
 /* Sidebar file tree and search results. */
 
+.tree-tools { display: flex; align-items: center; gap: 2px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--border); }
+.tree-tools .icon-btn { color: var(--muted); padding: 3px 5px; }
+.tree-tools .icon-btn:hover { color: var(--text); }
+
 /* tree */
-.tree, .side-results { overflow: auto; flex: 1; padding: 6px 4px 20px; font-size: 14px; }
-.tree ul { list-style: none; margin: 0; padding-left: 14px; }
-.tree > ul { padding-left: 0; }
+.tree, .side-results { overflow: auto; flex: 1; padding: 0 4px 20px; font-size: 14px; }
+.side-results { padding-top: 6px; }
+.tree ul { list-style: none; margin: 0; padding: 0; }
+/* A guide line down the side of each folder's contents shows what is inside what. */
+.tree ul ul { margin-left: 14px; padding-left: 3px; border-left: 1px solid var(--border); }
+.tree .dir.has-active > ul { border-left-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+
 .node {
-  display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none;
+  --row: 26px;
+  display: flex; align-items: center; gap: 6px; height: var(--row); padding: 0 8px; border-radius: 6px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; user-select: none; position: relative;
+  /* the folder rows stuck above it don't cover a row scrolled into view */
+  scroll-margin-top: calc(var(--d, 0) * var(--row));
 }
 .node:hover { background: var(--accent-soft); }
 .node.active { background: var(--accent); color: #fff; }
@@ -15,19 +26,49 @@
 .b-md { background: #4b5563; } .b-pdf { background: #d14343; } .b-doc { background: #2f6fdf; } .b-ppt { background: #d9741c; }
 .b-xls, .b-csv { background: #1f8f4e; } .b-htm { background: #7c4dcc; } .b-img { background: #0e9aa7; }
 .node.active .badge { box-shadow: 0 0 0 1px rgba(255,255,255,.7); }
-.chev::before { content: ""; display: inline-block; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-bottom: 3px; opacity: .7; }
-.dir.collapsed > .node .chev::before { transform: rotate(-45deg); margin-bottom: 0; }
-.node .name { overflow: hidden; text-overflow: ellipsis; }
+.node .name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.node .name mark { padding: 0; }
+
+/* Folder rows: chevron, folder icon, name and file count. The row sticks to the top of the list while the folder's
+   contents scroll past it, one row lower per level, so the folders you're in stay visible. */
+.dir > .node {
+  position: sticky; top: calc(var(--d, 0) * var(--row)); z-index: calc(40 - var(--d, 0));
+  background: var(--panel); font-weight: 600; gap: 4px; padding-left: 4px;
+}
+.dir > .node:hover { background: var(--accent-soft); }
+.dir.has-active > .node .name { color: var(--accent); }
+.chev { width: 14px; flex: none; text-align: center; color: var(--muted); }
+.chev::before { content: ""; display: inline-block; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-bottom: 3px; }
+.dir.collapsed > .node .chev::before { transform: rotate(-45deg); margin-bottom: 0; margin-right: 2px; }
+.ico.folder {
+  width: 18px; height: 15px; margin-right: 3px; background: #d4a03a;
+  -webkit-mask: var(--folder-open) center / contain no-repeat; mask: var(--folder-open) center / contain no-repeat;
+  --folder-open: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath d='M2 3.5A1.5 1.5 0 0 1 3.5 2h5.6l2 2.2h9.4A1.5 1.5 0 0 1 22 5.7V7H6.2a2 2 0 0 0-1.9 1.4L2 15.6z'/%3E%3Cpath d='M6.3 8.5H23L20.1 17a1.5 1.5 0 0 1-1.4 1H2.9z'/%3E%3C/svg%3E");
+}
+.dir.collapsed > .node .ico.folder {
+  --folder-open: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath d='M2 3.5A1.5 1.5 0 0 1 3.5 2h5.6l2 2.2h9.4A1.5 1.5 0 0 1 22 5.7v10.8a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 16.5z'/%3E%3C/svg%3E");
+}
+.node .count {
+  margin-left: auto; flex: none; font-size: 11px; font-weight: 500; color: var(--muted);
+  padding: 0 6px; border-radius: 9px; background: var(--bg); line-height: 17px;
+}
 .dir.collapsed > ul { display: none; }
-.node .add { margin-left: auto; flex: none; border: 0; background: none; color: inherit; font-size: 16px; line-height: 1;
-  padding: 0 4px; border-radius: 4px; cursor: pointer; opacity: 0; }
-.node .add + .add { margin-left: 0; }
+.node.flash { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* PDF and + buttons: over the count, shown on hover (always on touch screens) */
+.node .actions {
+  position: absolute; right: 4px; top: 0; bottom: 0; display: flex; align-items: center;
+  background: inherit; padding-left: 4px; opacity: 0;
+}
+.node:hover .actions, .node:focus-within .actions { opacity: 1; }
+.node .add { flex: none; border: 0; background: none; color: inherit; font-size: 16px; line-height: 1;
+  padding: 0 4px; border-radius: 4px; cursor: pointer; opacity: .7; }
 .node .add.pdf { font-size: 9px; font-weight: 700; letter-spacing: .3px; padding: 2px 4px; }
-.node:hover .add, .node .add:focus-visible { opacity: .7; }
-.node .add:hover { opacity: 1; background: var(--accent-soft); }
+.node .add:hover { opacity: 1; background: var(--panel); }
+@media (hover: none) { .node .actions { position: static; opacity: 1; background: none; } .node .count { display: none; } }
+
 .node.drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
 .tree.drop-root { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: 8px; }
-@media (hover: none) { .node .add { opacity: .7; } }
 .tree-empty { padding: 16px; color: var(--muted); }
 
 .result { padding: 8px 10px; border-radius: 8px; cursor: pointer; }

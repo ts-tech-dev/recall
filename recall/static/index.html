@@ -60,6 +60,13 @@
       <label class="check small"><input type="checkbox" id="tree-images"> images</label>
       <button class="btn ghost small" id="new-note" title="Create a new Markdown note">+ Note</button>
     </div>
+    <div class="tree-tools">
+      <span class="muted small" id="tree-count"></span>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="tree-reveal" title="Show the open note in the list" aria-label="Show the open note in the list"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button class="icon-btn" id="tree-expand" title="Expand all folders" aria-label="Expand all folders"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9l5-5 5 5M7 15l5 5 5-5"/></svg></button>
+      <button class="icon-btn" id="tree-collapse" title="Collapse all folders" aria-label="Collapse all folders"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg></button>
+    </div>
     <div id="side-results" class="side-results" hidden></div>
     <div id="tree" class="tree" role="tree"></div>
   </aside>
@@ -121,8 +128,8 @@
       <div id="doc" hidden>
         <div class="doc-head">
           <div>
+            <nav class="doc-path muted small" id="doc-path" aria-label="Folder"></nav>
             <h1 id="doc-title"></h1>
-            <div class="doc-path muted small" id="doc-path"></div>
             <div class="tags" id="doc-tags"></div>
           </div>
           <div class="doc-actions">

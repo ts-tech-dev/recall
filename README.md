@@ -73,6 +73,11 @@ the certificates Windows trusts and `HTTPS_PROXY`, so it works behind company pr
   *Sources* list linking to the notes they came from. Its links and images are ordinary relative ones (images taken
   from PDFs and Office files are copied next to it), so the note works in any Markdown editor. Recent questions
   are saved in the browser. *Passages retrieved for Ask* in Settings sets how many are fetched.
+- **File list**: folders have a folder icon and the number of files inside, and a line runs down the side of each
+  folder's contents, so it's clear what is in what. While you scroll, the folders you're in stay pinned at the top of
+  the list. The folders holding the open note are highlighted (even when collapsed), and opening a note from search,
+  Ctrl+K or a link opens its folders and scrolls to it. Above the list: *Show the open note*, *Expand all* and
+  *Collapse all*. Above each note, its folders are shown as a path. Click one to show that folder in the list.
 - **Browse**: file tree with name filter, keyword search with highlighted snippets, and previews:
   rendered Markdown (relative images, Obsidian `![[embeds]]` and `[[wikilinks]]`), the browser's own PDF
   viewer (or a text view), converted Word/PowerPoint/Excel/CSV/HTML, and an outline for longer notes.

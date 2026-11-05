@@ -8,6 +8,7 @@ import { openDoc } from "./viewer.js";
 import { exportFolder } from "./export.js";
 
 export async function loadTree() {
+  $("#tree-count").textContent = "";
   if (!state.status?.notes_dir) {
     $("#tree").innerHTML = `<div class="tree-empty">Choose a notes folder in <a href="#" id="tree-settings">Settings</a>.</div>`;
     $("#tree-settings").onclick = e => { e.preventDefault(); openSettings(); };
@@ -17,30 +18,113 @@ export async function loadTree() {
     state.tree = await api("/api/tree" + ($("#tree-images").checked ? "?images=true" : ""));
   } catch (e) { $("#tree").innerHTML = `<div class="tree-empty">${esc(e.message)}</div>`; return; }
   renderTree();
+  const root = $("#doc-path a[data-folder='']");  // a note opened before the list arrived: name the top folder
+  if (root) root.textContent = state.tree.name;
   fillFolderFilter();
   fillTagFilter();
 }
 
+function collapsedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem("collapsed") || "[]")); } catch { return new Set(); }
+}
+function saveCollapsed(set) {
+  try { localStorage.setItem("collapsed", JSON.stringify([...set])); } catch {}
+}
+
+/** `text` escaped, with the first match of `filter` (lowercase) marked. */
+function withMatch(text, filter) {
+  const i = filter ? text.toLowerCase().indexOf(filter) : -1;
+  if (i < 0) return esc(text);
+  return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + filter.length)) + "</mark>" + esc(text.slice(i + filter.length));
+}
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/**
+ * The file list. Folders have an icon, the number of files inside and a guide line down the side of their contents.
+ * A folder's row sticks to the top while its contents scroll past, so the folder you're in stays in view, and the
+ * folders that hold the open note are highlighted, even when collapsed.
+ */
 export function renderTree() {
   const filter = $("#tree-filter").value.trim().toLowerCase();
-  const collapsed = JSON.parse(localStorage.getItem("collapsed") || "[]");
-  const build = node => {
+  const collapsed = collapsedSet();
+  const current = state.currentDoc || "";
+  const build = (node, depth) => {
     const items = [];
+    let count = 0;
     for (const c of node.children) {
       if (c.type === "dir") {
-        const inner = build(c);
-        if (!inner && filter) continue;
-        const cls = !filter && collapsed.includes(c.path) ? "dir collapsed" : "dir";
-        items.push(`<li class="${cls}" data-dir="${esc(c.path)}"><div class="node" role="treeitem"><span class="ico chev" aria-hidden="true"></span><span class="name">${esc(c.name)}</span><button class="add pdf" data-export="${esc(c.path)}" title="Export notes in ${esc(c.path)} as one PDF" aria-label="Export notes in ${esc(c.path)} as one PDF">PDF</button><button class="add" data-add="${esc(c.path)}" title="New note in ${esc(c.path)}" aria-label="New note in ${esc(c.path)}">+</button></div>${inner || "<ul></ul>"}</li>`);
+        const inner = build(c, depth + 1);
+        if (!inner.count && filter) continue;
+        count += inner.count;
+        const cls = ["dir", !filter && collapsed.has(c.path) && "collapsed", current.startsWith(c.path + "/") && "has-active"]
+          .filter(Boolean).join(" ");
+        items.push(`<li class="${cls}" data-dir="${esc(c.path)}"><div class="node" role="treeitem" style="--d:${depth}" title="${esc(c.path)}">` +
+          `<span class="chev" aria-hidden="true"></span><span class="ico folder" aria-hidden="true"></span>` +
+          `<span class="name">${withMatch(c.name, filter)}</span><span class="count" title="${plural(inner.count, "file")}">${inner.count}</span>` +
+          `<span class="actions"><button class="add pdf" data-export="${esc(c.path)}" title="Export notes in ${esc(c.path)} as one PDF" aria-label="Export notes in ${esc(c.path)} as one PDF">PDF</button>` +
+          `<button class="add" data-add="${esc(c.path)}" title="New note in ${esc(c.path)}" aria-label="New note in ${esc(c.path)}">+</button></span></div>` +
+          `${inner.html || "<ul></ul>"}</li>`);
       } else {
         if (filter && !c.path.toLowerCase().includes(filter)) continue;
-        const active = state.currentDoc === c.path ? " active" : "";
-        items.push(`<li><div class="node${active}" role="treeitem" draggable="true" data-path="${esc(c.path)}" title="${esc(c.path)}"><span class="ico badge b-${ICONS[c.ext] || "img"}" aria-hidden="true">${ICONS[c.ext] || "img"}</span><span class="name">${esc(c.name)}</span></div></li>`);
+        count++;
+        const active = current === c.path ? " active" : "";
+        items.push(`<li><div class="node file${active}" role="treeitem" draggable="true" data-path="${esc(c.path)}" style="--d:${depth}" title="${esc(c.path)}">` +
+          `<span class="ico badge b-${ICONS[c.ext] || "img"}" aria-hidden="true">${ICONS[c.ext] || "img"}</span><span class="name">${withMatch(c.name, filter)}</span></div></li>`);
       }
     }
-    return items.length ? `<ul>${items.join("")}</ul>` : "";
+    return { html: items.length ? `<ul>${items.join("")}</ul>` : "", count };
   };
-  $("#tree").innerHTML = build(state.tree) || `<div class="tree-empty">${filter ? "No matching files." : "No supported files found in this folder."}</div>`;
+  const { html, count } = build(state.tree, 0);
+  $("#tree").innerHTML = html || `<div class="tree-empty">${filter ? "No matching files." : "No supported files found in this folder."}</div>`;
+  $("#tree-count").textContent = filter ? `${plural(count, "file")} found` : plural(count, "file");
+}
+
+/** Highlight `path` (the open note) and the folders it's in; with `reveal`, open those folders and scroll to it. */
+export function markActive(path, { reveal = true } = {}) {
+  const tree = $("#tree");
+  $$(".node.active", tree).forEach(n => n.classList.remove("active"));
+  $$(".dir.has-active", tree).forEach(n => n.classList.remove("has-active"));
+  const node = path && $$(".node[data-path]", tree).find(n => n.dataset.path === path);
+  if (!node) return;
+  node.classList.add("active");
+  const set = collapsedSet();
+  let opened = false;
+  for (let li = node.closest("li.dir"); li; li = li.parentElement.closest("li.dir")) {
+    li.classList.add("has-active");
+    if (reveal && li.classList.contains("collapsed")) { li.classList.remove("collapsed"); set.delete(li.dataset.dir); opened = true; }
+  }
+  if (opened) saveCollapsed(set);
+  if (reveal && !tree.hidden) node.scrollIntoView({ block: "nearest" });
+}
+
+/** Show the whole file list: clear the name filter and the search results. */
+function showWholeTree() {
+  if ($("#tree-filter").value) { $("#tree-filter").value = ""; renderTree(); }
+  if (!$("#side-results").hidden) { $("#side-q").value = ""; sideSearch(""); }
+}
+
+/** Open a folder (and the folders around it) in the file list, scroll to it and flash it ("" = the top). */
+export function revealFolder(folder) {
+  showWholeTree();
+  $("#sidebar").classList.add("open");  // narrow screens: the file list slides in
+  const tree = $("#tree");
+  const li = folder && $(`li[data-dir="${CSS.escape(folder)}"]`, tree);
+  if (!li) { tree.scrollTop = 0; return; }
+  const set = collapsedSet();
+  for (let d = li; d; d = d.parentElement.closest("li.dir")) { d.classList.remove("collapsed"); set.delete(d.dataset.dir); }
+  saveCollapsed(set);
+  const node = li.firstElementChild;
+  node.scrollIntoView({ block: "start" });
+  node.classList.add("flash"); setTimeout(() => node.classList.remove("flash"), 1600);
+}
+
+/** Collapse or expand every folder. */
+function setAllCollapsed(collapse) {
+  const dirs = $$("li.dir", $("#tree"));
+  const set = new Set(collapse ? dirs.map(li => li.dataset.dir) : []);
+  saveCollapsed(set);
+  dirs.forEach(li => li.classList.toggle("collapsed", set.has(li.dataset.dir)));
 }
 
 export function fillFolderFilter() {
@@ -124,12 +208,19 @@ export function bindTree() {
     if (node.dataset.path) return openDoc(node.dataset.path);
     const li = node.parentElement;
     li.classList.toggle("collapsed");
-    const set = new Set(JSON.parse(localStorage.getItem("collapsed") || "[]"));
+    const set = collapsedSet();
     li.classList.contains("collapsed") ? set.add(li.dataset.dir) : set.delete(li.dataset.dir);
-    localStorage.setItem("collapsed", JSON.stringify([...set]));
+    saveCollapsed(set);
   });
   bindTreeDrag();
   $("#tree-filter").oninput = renderTree;
+  $("#tree-collapse").onclick = () => setAllCollapsed(true);
+  $("#tree-expand").onclick = () => setAllCollapsed(false);
+  $("#tree-reveal").onclick = () => {
+    if (!state.currentDoc) return toast("Open a note first");
+    showWholeTree();
+    markActive(state.currentDoc);
+  };
   $("#tree-images").onchange = loadTree;
   $("#new-note").onclick = () => newNote();
   $("#side-q").addEventListener("keydown", e => { if (e.key === "Enter") sideSearch(e.target.value.trim()); });

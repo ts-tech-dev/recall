@@ -8,7 +8,7 @@ import { renderGraph } from "./graph.js";
 import { moveCurrentDoc, renameCurrentDoc } from "./files.js";
 import { setScope } from "./ask.js";
 import { setTask } from "./tasks.js";
-import { sideSearch } from "./tree.js";
+import { markActive, revealFolder, sideSearch } from "./tree.js";
 import { exportFolder, exportPdf } from "./export.js";
 import { rememberRecent } from "./switcher.js";
 
@@ -30,10 +30,10 @@ export async function openDoc(path, anchor = "", { pushHash = true, force = fals
   if (state.currentDoc !== path || force) {
     state.currentDoc = path;
     rememberRecent(path);
-    $$(".node.active").forEach(n => n.classList.remove("active"));
-    $$(".node[data-path]").forEach(n => { if (n.dataset.path === path) n.classList.add("active"); });
+    markActive(path);
     $("#doc-empty").hidden = true; $("#doc").hidden = false;
     $("#doc-title").textContent = path.split("/").pop();
+    renderBreadcrumb(path);
     if (keepScroll === null) { $("#doc-content").className = "md"; $("#doc-content").innerHTML = `<p class="muted">Loading…</p>`; }
     let d;
     // PDFs open in the browser's viewer; their extracted text is only fetched for "Text view".
@@ -47,10 +47,20 @@ export async function openDoc(path, anchor = "", { pushHash = true, force = fals
   else $(".main").scrollTop = keepScroll ?? 0;
 }
 
+/** The folders a note is in, above its title. Each one shows that folder in the file list. */
+function renderBreadcrumb(path) {
+  const parts = path.split("/"), name = parts.pop();
+  const sep = `<span class="sep" aria-hidden="true">›</span>`;
+  const crumb = (label, folder) =>
+    `<a href="#" data-folder="${esc(folder)}" title="Show ${esc(folder || "the top folder")} in the file list">${esc(label)}</a>`;
+  const crumbs = [crumb(state.tree?.name || "Notes", ""), ...parts.map((p, i) => crumb(p, parts.slice(0, i + 1).join("/")))];
+  $("#doc-path").innerHTML = crumbs.join(sep) + sep + `<span class="here">${esc(name)}</span>`;
+}
+
 export function renderDoc(d) {
   state.docMtime = d.mtime_ns;
   $("#doc-title").textContent = d.title;
-  $("#doc-path").textContent = d.path;
+  renderBreadcrumb(d.path);
   $("#doc-raw").href = d.raw_url;
   $("#doc-tags").innerHTML = (d.tags || []).map(t => `<span class="tag">#${esc(t)}</span>`).join("");
   const c = $("#doc-content"), toggle = $("#doc-pdf-toggle");
@@ -164,6 +174,10 @@ export function bindViewer() {
     showView("ask");
     $("#question").focus();
   };
+  $("#doc-path").addEventListener("click", e => {
+    const a = e.target.closest("a[data-folder]");
+    if (a) { e.preventDefault(); revealFolder(a.dataset.folder); }
+  });
   $("#toc").addEventListener("click", e => {
     const a = e.target.closest("a[data-anchor]");
     if (a) { e.preventDefault(); scrollToAnchor(a.dataset.anchor); }
