@@ -45,6 +45,7 @@ class Settings:
     ocr: bool = True  # read text from images and scanned PDF pages
     watch: bool = True  # re-index automatically when files change
     port: int = 9999  # where the Windows app serves (RECALL_PORT overrides; the command line uses --port)
+    remote_images: bool = False  # let notes show images from the internet (otherwise the page's CSP blocks them)
 
     def public(self) -> dict:
         """Settings as sent to the browser."""

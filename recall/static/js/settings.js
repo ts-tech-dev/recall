@@ -7,7 +7,7 @@ import { loadTree } from "./tree.js";
 import { changePort } from "./appctl.js";
 
 export const TEXT_SETTINGS = ["notes_dir", "top_k", "embed_model", "rerank_model"];
-export const BOOL_SETTINGS = ["semantic_search", "rerank", "ocr", "watch"];
+export const BOOL_SETTINGS = ["semantic_search", "rerank", "ocr", "watch", "remote_images"];
 
 export function openSettings() {
   const f = $("#settings-form"), s = state.status?.settings || {};
@@ -45,9 +45,12 @@ export async function saveSettings(ev) {
   if (app && !app.port_locked && port !== app.port && !(port >= 1024 && port <= 65535)) {
     $("#settings-error").textContent = "Pick a port from 1024 to 65535."; return;
   }
+  const remoteBefore = !!state.status?.settings?.remote_images;
   try {
     await api("/api/settings", { method: "POST", headers: H, body: JSON.stringify(body) });
   } catch (err) { $("#settings-error").textContent = err.message; return; }
+  // The page's security policy decides whether remote images may load, and it's set when the page loads.
+  if (body.remote_images !== remoteBefore && !(app && !app.port_locked && port !== app.port)) { location.reload(); return; }
   if (app && !app.port_locked && port !== app.port) {
     try { await changePort(port); } catch (err) { $("#settings-error").textContent = err.message; }
     return;

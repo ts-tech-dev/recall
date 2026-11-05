@@ -21,9 +21,13 @@ def main():
         s = load_settings()
         s.notes_dir = os.environ["RECALL_NOTES_DIR"]
         save_settings(s)
+    from .access import open_url
+
     shown = "localhost" if a.host in ("127.0.0.1", "0.0.0.0", "::") else a.host
-    print(f"Recall running at http://{shown}:{a.port}")
-    uvicorn.run(create_app(), host=a.host, port=a.port, log_level="warning")
+    app = create_app()
+    # The key lets this browser in once; it then keeps it in a cookie (see recall/access.py).
+    print(f"Recall running at {open_url(f'http://{shown}:{a.port}/')}", flush=True)
+    uvicorn.run(app, host=a.host, port=a.port, log_level="warning")
 
 
 if __name__ == "__main__":

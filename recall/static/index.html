@@ -5,15 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recall</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6fdf'/><path d='M9 8h9a5 5 0 0 1 0 10h-3l6 6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/><path d='M9 8v16' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>">
-<script>
-  // Apply the saved color theme before the page paints (see js/theme.js).
-  (() => {
-    let t = "auto";
-    try { t = localStorage.getItem("theme") || "auto"; } catch {}
-    if (t === "auto") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    document.documentElement.dataset.theme = t;
-  })();
-</script>
+<script src="/static/js/early-theme.js"></script>
 <link rel="stylesheet" id="hljs-light" href="/static/vendor/hljs-github.min.css" media="(prefers-color-scheme: light)">
 <link rel="stylesheet" id="hljs-dark" href="/static/vendor/hljs-github-dark.min.css" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
@@ -234,6 +226,13 @@
       <label class="check"><input type="checkbox" name="watch"> Re-index automatically when files change</label>
       <label>Passages retrieved for Ask <input name="top_k" type="number" min="1" max="50"></label>
       <span class="hint" id="feature-hint"></span>
+    </fieldset>
+    <fieldset>
+      <legend>Security &amp; data</legend>
+      <label class="check"><input type="checkbox" name="remote_images"> Show images from the internet in notes</label>
+      <span class="hint">Off: a note can't make your browser contact another server (which would tell it that you opened the note). Such images show as a link instead.</span>
+      <p class="hint">What Recall stores and where, what it connects to, how it runs on Windows, and its limits. For IT and security reviews.</p>
+      <a class="btn ghost small" href="/api/security-doc" download>Download security document (.md)</a>
     </fieldset>
     <p class="error" id="settings-error"></p>
     <div class="dialog-actions">

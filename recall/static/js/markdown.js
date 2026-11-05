@@ -60,7 +60,10 @@ function markTasks(el) {
  * `light`: draw diagrams in the light theme (for PDF export). Resolves once diagrams are drawn.
  */
 export function renderMarkdown(el, md, { answer = false, onTask = null, light = false } = {}) {
-  el.innerHTML = DOMPurify.sanitize(parse(md), { ADD_ATTR: ["target"] });
+  keepRemote = !answer && !!state.status?.settings?.remote_images;
+  // <style> would restyle the whole app, not just the note: dropped (style="…" attributes are kept).
+  el.innerHTML = DOMPurify.sanitize(parse(md), { ADD_ATTR: ["target"], FORBID_TAGS: ["style"] });
+  if (!answer) blockRemoteMedia(el);
   if (answer) {
     $$("img", el).forEach(img => { if (!(img.getAttribute("src") || "").startsWith("/api/")) img.remove(); });
     linkCitations(el);
@@ -74,6 +77,35 @@ export function renderMarkdown(el, md, { answer = false, onTask = null, light = 
   links(el);
   if (onTask) enableTasks(el, onTask);
   return drawn;
+}
+
+/**
+ * Images, video and audio from the internet would let the server they come from see that the note was opened, so
+ * the page's CSP blocks them (unless "Show images from the internet" is on in Settings). While sanitizing, their
+ * address is moved out of `src`, so the browser doesn't even try (`blockRemoteMedia` then shows a link instead).
+ */
+const REMOTE_RE = /^\s*(https?:)?\/\//i;
+let keepRemote = false;
+DOMPurify.addHook("afterSanitizeAttributes", node => {
+  if (keepRemote || !node.getAttribute) return;
+  for (const attr of ["src", "poster"]) {
+    const v = node.getAttribute(attr);
+    if (v && REMOTE_RE.test(v)) { node.setAttribute("data-remote-" + attr, v); node.removeAttribute(attr); }
+  }
+  if (/(^|,)\s*(https?:)?\/\//i.test(node.getAttribute("srcset") || "")) node.removeAttribute("srcset");
+});
+
+function blockRemoteMedia(el) {
+  for (const m of $$("[data-remote-src]", el)) {
+    const src = m.getAttribute("data-remote-src");
+    let host = src;
+    try { host = new URL(src, location.href).host; } catch {}
+    const a = document.createElement("a");
+    a.className = "remote-media"; a.href = src; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.title = `Not loaded: Recall doesn't load images from the internet (Settings → Security & data). Click to open ${src}`;
+    a.textContent = `🖼 ${m.getAttribute("alt") || "Image"} (${host})`;
+    (m.closest("video, audio") || m).replaceWith(a);
+  }
 }
 
 /** Turn [3] / [2][4] in answer text into clickable source chips (skips code). */

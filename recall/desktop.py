@@ -56,8 +56,8 @@ def _redirect_output(data: Path) -> None:
 
 def _running_recall(port: int) -> bool:
     try:
-        with urllib.request.urlopen(f"http://{HOST}:{port}/api/status", timeout=1) as r:
-            return "notes_dir" in json.load(r)
+        with urllib.request.urlopen(f"http://{HOST}:{port}/healthz", timeout=1) as r:
+            return json.load(r).get("app") == "recall"
     except Exception:
         return False
 
@@ -127,6 +127,13 @@ class Launcher:
     def url(self) -> str:
         return f"http://localhost:{self.port}/"
 
+    @property
+    def open_url(self) -> str:
+        """`url` with the access key, which lets the browser in (see recall/access.py)."""
+        from .access import open_url
+
+        return open_url(self.url)
+
     def serve(self, port: int) -> None:
         """Start serving on `port`, then stop the previous server (so the app is never unreachable)."""
         import uvicorn
@@ -185,7 +192,7 @@ def _run_tray(launcher: Launcher) -> bool:
         import pystray
 
         icon = pystray.Icon("Recall", _tray_image(), f"Recall — {launcher.url}", menu=pystray.Menu(
-            pystray.MenuItem("Open Recall", lambda *_: webbrowser.open(launcher.url), default=True),
+            pystray.MenuItem("Open Recall", lambda *_: webbrowser.open(launcher.open_url), default=True),
             pystray.MenuItem("Quit", lambda icon, _item: icon.stop()),
         ))
         launcher.icon = icon
@@ -211,7 +218,9 @@ def main() -> None:
 
     # Already running (e.g. launched twice): just open it.
     if _running_recall(preferred):
-        _open_browser(f"http://localhost:{preferred}/")
+        from .access import open_url
+
+        _open_browser(open_url(f"http://localhost:{preferred}/"))
         return
 
     from .app import create_app
@@ -225,7 +234,7 @@ def main() -> None:
         raise SystemExit(f"{e}; see recall.log in {data}")
 
     print(f"Recall running at {launcher.url}")
-    _open_browser(launcher.url)
+    _open_browser(launcher.open_url)
 
     if not _run_tray(launcher):
         launcher.done.wait()

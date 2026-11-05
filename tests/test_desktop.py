@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from recall.app import create_app
 from recall.config import load_settings
 from recall.desktop import Launcher
+from tests.conftest import keyed
 
 H = {"X-Recall": "1"}
 
@@ -22,8 +23,8 @@ def free_port() -> int:
 
 def answers(port: int) -> bool:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=2) as r:
-            return "notes_dir" in json.load(r)
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as r:
+            return json.load(r)["app"] == "recall"
     except OSError:
         return False
 
@@ -44,11 +45,11 @@ class FakeLauncher:
 def app_client(data):
     app = create_app(auto_index=False)
     app.state.launcher = FakeLauncher()
-    return TestClient(app), app.state.launcher
+    return keyed(app), app.state.launcher
 
 
 def test_no_app_controls_without_launcher(data):
-    c = TestClient(create_app(auto_index=False))
+    c = keyed(create_app(auto_index=False))
     assert c.get("/api/status").json()["app"] is None
     assert c.post("/api/app/shutdown", headers=H).status_code == 404
     assert c.post("/api/app/port", json={"port": 8123}, headers=H).status_code == 404

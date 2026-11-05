@@ -71,3 +71,7 @@
 .md .callout-question, .md .callout-warning { --c: #d9741c; }
 .md .callout-danger { --c: #d14343; }
 .md .callout-quote { --c: #8a94a6; }
+/* An image from the internet that wasn't loaded (Settings → Security & data) */
+.md a.remote-media { display: inline-block; margin: 4px 0; padding: 2px 8px; border: 1px dashed var(--border); border-radius: 6px;
+  font-size: 13px; color: var(--muted); text-decoration: none; }
+.md a.remote-media:hover { border-color: var(--accent); color: var(--accent); }

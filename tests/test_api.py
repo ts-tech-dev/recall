@@ -5,6 +5,8 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.conftest import keyed
+
 from recall.app import create_app
 
 H = {"X-Recall": "1"}
@@ -12,7 +14,7 @@ H = {"X-Recall": "1"}
 
 @pytest.fixture()
 def client(data):
-    return TestClient(create_app(auto_index=False))
+    return keyed(create_app(auto_index=False))
 
 
 @pytest.fixture()
@@ -112,6 +114,42 @@ def test_file_traversal_blocked(ready):
     assert ready.get("/api/file", params={"path": "../data/config.json"}).status_code == 403
     assert ready.get("/api/file", params={"path": "/etc/passwd"}).status_code == 403
     assert ready.get("/api/file", params={"path": "nope.md"}).status_code == 404
+
+
+def test_hidden_files_not_served(ready, notes):
+    (notes / ".git").mkdir(exist_ok=True)
+    (notes / ".git" / "config").write_text("secret")
+    (notes / ".env.md").write_text("secret")
+    for path in (".git/config", ".env.md"):
+        assert ready.get("/api/file", params={"path": path}).status_code == 403
+        assert ready.get("/api/doc", params={"path": path}).status_code == 403
+
+
+def test_pages_cannot_be_framed_by_other_sites(client):
+    r = client.get("/")
+    assert r.headers["x-frame-options"] == "SAMEORIGIN"
+    assert r.headers["content-security-policy"].endswith("frame-ancestors 'self'")
+    assert client.get("/api/status").headers["content-security-policy"] == "frame-ancestors 'self'"
+    assert r.headers["referrer-policy"] == "no-referrer"
+    assert r.headers["cross-origin-resource-policy"] == "same-site"
+
+
+def test_security_document_downloads_with_this_installation(client, data):
+    from recall import __version__
+
+    r = client.get("/api/security-doc")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/markdown")
+    assert f'filename="Recall-{__version__}-security.md"' in r.headers["content-disposition"]
+    assert f"Recall {__version__}" in r.text and str(data) in r.text and "{{" not in r.text
+
+
+def test_security_document_lists_every_endpoint(client):
+    from recall.api.about import SECURITY_DOC
+
+    doc = SECURITY_DOC.read_text()
+    for path, methods in client.get("/openapi.json").json()["paths"].items():
+        for m in methods:
+            assert f"`{m.upper()} {path}" in doc, f"{m.upper()} {path} is missing from SECURITY.md"
 
 
 def test_file_is_sandboxed(ready):

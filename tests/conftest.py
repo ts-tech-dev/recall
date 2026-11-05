@@ -197,3 +197,12 @@ def embedder():
     except Exception as exc:
         pytest.skip(f"embedding model unavailable: {exc}")
     return e
+
+
+def keyed(app):
+    """A test client that has Recall's access key, as a browser opened by the app would."""
+    from fastapi.testclient import TestClient
+
+    from recall.access import HEADER, access_key
+
+    return TestClient(app, headers={HEADER: access_key()})

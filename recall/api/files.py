@@ -16,12 +16,17 @@ router = APIRouter(prefix="/api")
 
 
 def safe_file(idx: Index, rel: str) -> Path:
-    """An existing file inside the notes folder (403 outside it, 404 if missing)."""
+    """An existing, visible file inside the notes folder (403 outside it or hidden, 404 if missing).
+
+    Hidden files and folders (".git", ".obsidian"…) are never indexed or listed, so they aren't served either.
+    """
     p = (idx.root / rel).resolve()
     try:
-        p.relative_to(idx.root)
+        inner = p.relative_to(idx.root)
     except ValueError:
         raise HTTPException(403, "Path outside notes directory")
+    if any(part.startswith(".") for part in inner.parts):
+        raise HTTPException(403, "Hidden files are not served")
     if not p.is_file():
         raise HTTPException(404, "File not found")
     return p

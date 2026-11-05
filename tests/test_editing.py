@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from recall import editing
 from recall.app import create_app
 from recall.editing import EditError
-from tests.conftest import make_png
+from tests.conftest import keyed, make_png
 
 H = {"X-Recall": "1"}
 
@@ -167,7 +167,7 @@ def test_move_refusals(notes, tmp_path, rel, folder, status):
 
 @pytest.fixture()
 def api(data, notes):
-    c = TestClient(create_app(auto_index=False))
+    c = keyed(create_app(auto_index=False))
     c.post("/api/settings", json={"notes_dir": str(notes), "semantic_search": False, "rerank": False, "ocr": False},
            headers=H)
     c.post("/api/index?wait=true", headers=H)

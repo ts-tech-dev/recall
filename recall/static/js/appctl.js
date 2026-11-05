@@ -15,7 +15,7 @@ function overlay(html) {
 /** Wait until something answers at `url` (another origin, so the reply itself can't be read). */
 async function reachable(url, ms = 30000) {
   for (const end = Date.now() + ms; Date.now() < end; await sleep(500)) {
-    try { await fetch(url + "api/status", { mode: "no-cors", cache: "no-store" }); return true; } catch {}
+    try { await fetch(url + "healthz", { mode: "no-cors", cache: "no-store" }); return true; } catch {}
   }
   return false;
 }

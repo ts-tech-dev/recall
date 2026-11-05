@@ -14,8 +14,14 @@ that run on your CPU.
 cd /srv/projects/recall
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m recall.fetch_models     # once: puts the search models in ./models (~300 MB)
-.venv/bin/python -m recall --notes ~/notes # then open http://localhost:9999
+.venv/bin/python -m recall --notes ~/notes # then open the address it prints (http://localhost:9999/?key=…)
 ```
+
+**Access key.** Recall only answers browsers that have its key, so other people signed in to the same computer
+(and other websites) can't reach your notes. It's made on first run and kept in the data folder. The Windows app
+opens the browser with it, and the command line and Docker print the address with `?key=…`. Open that once: the
+browser keeps the key in a cookie, and plain `http://localhost:9999` and bookmarks work from then on. Scripts can
+send it in an `X-Recall-Key` header. `RECALL_KEY` sets your own key. To change it, delete `key` in the data folder.
 
 If OpenCV fails to import with a `libGL.so.1` error (headless servers), run
 `.venv/bin/pip uninstall -y opencv-python && .venv/bin/pip install opencv-python-headless`.
@@ -28,11 +34,11 @@ The settings file is written with `0600` permissions.
 
 ```bash
 cp .env.example .env   # set NOTES_DIR, and RECALL_BIND / RECALL_ALLOWED_HOSTS to reach it from other machines
-docker compose up -d --build   # then open http://localhost:9999 (RECALL_PORT in .env)
+docker compose up -d --build   # then open the address in `docker logs recall` (http://localhost:9999/?key=…)
 ```
 
 Notes are mounted at `/notes` and edited as uid 1000. Settings and the index are kept in the `recall-data`
-volume. The search models are built into the image, so the container needs no internet. Recall has no login, so publish it only on an address you trust (localhost or a
+volume. The search models are built into the image, so the container needs no internet. Recall has no user accounts (everyone with the key has full access) and no HTTPS, so publish it only on an address you trust (localhost or a
 Tailscale IP), not `0.0.0.0` on a shared network.
 
 ## Windows app
@@ -44,8 +50,8 @@ powershell -ExecutionPolicy Bypass -File packaging\build-windows.ps1
 ```
 
 This creates `dist\Recall\Recall.exe` (copy the whole `dist\Recall` folder, or `dist\Recall-windows.zip`).
-It starts Recall and opens it in your default browser (Edge, Chrome…) at http://localhost:9999. Bookmark that
-address. The first time, Settings opens so you can pick the notes folder and the **port** Recall runs on. You can
+It starts Recall and opens it in your default browser (Edge, Chrome…) at http://localhost:9999, with its access
+key. After that, a bookmark to http://localhost:9999 works. In a new browser, use *Open Recall* on the tray icon. The first time, Settings opens so you can pick the notes folder and the **port** Recall runs on. You can
 change the port later in Settings (*App*). Recall then restarts at the new address and the page follows it.
 Questions, the theme and other choices saved in the browser are kept per address. The **⏻** button in the top bar
 (or *Shut down Recall* in Settings) closes the app. A tray icon (bottom-right, near the clock) has *Open Recall* and
@@ -178,7 +184,8 @@ Each piece lives in its own file, so it can be changed without touching the rest
 | `recall/desktop.py` | Windows app launcher: server + browser + tray icon, port changes and shut down |
 | `recall/app.py` | Builds the FastAPI app: request guard, routers, static files |
 | `recall/state.py` | Settings, the open index and the folder watcher, shared by the routes |
-| `recall/api/` | HTTP API, one router per area: `status`, `files`, `search`, `edit`, `ask`, `control` (app port, shut down) |
+| `recall/api/` | HTTP API, one router per area: `status`, `files`, `search`, `edit`, `ask`, `control` (app port, shut down), `about` (security document) |
+| `recall/docs/SECURITY.md` | Security and data-handling document (downloadable in Settings) |
 | `recall/extractors/` | One module per file format (`markdown`, `pdf`, `docx`, `pptx`, `sheets`, `html`); register new ones in `__init__.py` |
 | `recall/index/` | The index: `core` (database, files), `build` (indexing), `search`, `graph`, `query` (filters), `schema` |
 | `recall/chunker.py` | Splits Markdown into heading-scoped chunks |
@@ -194,11 +201,19 @@ Each piece lives in its own file, so it can be changed without touching the rest
 
 ## Security notes
 
-- The server binds to `127.0.0.1`. Requests with a foreign `Host` header are refused (DNS-rebinding
-  protection). Write requests need an `X-Recall` header, so other websites can't drive the API.
-- Files are served only from inside the notes folder (path traversal is blocked), with a sandboxing CSP.
-- Note content is sanitized with DOMPurify before rendering.
-- Nothing is sent to an AI service. The only downloads are the local search models, once.
+The full security and data-handling document for IT reviews is [`recall/docs/SECURITY.md`](recall/docs/SECURITY.md).
+It covers every place data is stored, network behavior, Windows integration, the API and known limits. It can be
+downloaded from **Settings → Security & data**, with this installation's version and folders filled in. In short:
+
+- The server binds to `127.0.0.1` and has no user accounts, but answers only requests that carry its access key
+  (a cookie the app sets in the browser), so other users of the same computer get nothing. Requests with a foreign
+  `Host` header are refused (DNS-rebinding protection). Write requests need an `X-Recall`
+  header, so other websites can't drive the API, and other sites can't frame or embed Recall's pages and files.
+- Files are served only from inside the notes folder (path traversal is blocked, hidden files aren't served), with a
+  sandboxing CSP.
+- Note content is sanitized with DOMPurify before rendering. The page's Content-Security-Policy allows scripts only
+  from Recall's own files and stops notes from loading images from the internet (a setting allows them).
+- The server makes no network connections: no AI services, telemetry or update checks, and the models ship with it.
 
 ## Tests
 
@@ -221,6 +236,7 @@ The fixtures generate a sample notes folder covering every file type, with image
 | `test_images.py` | OCR (images, scanned PDFs, cache), loose versus embedded images, text folded into passages |
 | `test_watcher.py` | Create, modify and delete picked up live; bursts debounced; hidden files ignored |
 | `test_graph.py` | Links and backlinks, updates after edits, dangling links, graph nodes and edges, similarity edges |
+| `test_access.py` | Access key: made once and private, required everywhere but `/static` and `/healthz`, cookie flow; the page's CSP |
 | `test_desktop.py` | App port setting, moving to another port, shutting down, the API for both |
 | `test_editing.py` | Save, conflict and force, versions, unsafe paths, new notes, moves and link updates, folders, image uploads, timestamp precision, API flow |
 

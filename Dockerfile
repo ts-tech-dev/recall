@@ -30,6 +30,6 @@ VOLUME ["/data"]
 EXPOSE 9999
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9999/api/status', timeout=4)"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9999/healthz', timeout=4)"
 
 CMD ["python", "-m", "recall", "--host", "0.0.0.0", "--port", "9999"]

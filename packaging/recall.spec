@@ -6,7 +6,8 @@ import sys
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 root = os.path.abspath(os.path.join(SPECPATH, ".."))
-datas = [(os.path.join(root, "recall", "static"), os.path.join("recall", "static"))]
+datas = [(os.path.join(root, "recall", "static"), os.path.join("recall", "static")),
+         (os.path.join(root, "recall", "docs"), os.path.join("recall", "docs"))]  # SECURITY.md, downloadable in Settings
 # The app is offline: it ships the search models (fetched by build-windows.ps1) and never downloads them.
 models = os.path.join(root, "models")
 if not os.path.isdir(models):
